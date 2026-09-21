@@ -63,6 +63,8 @@ export const api = {
   eventAttendees: (id: string) => req(`/events/${id}/attendees`),
 
   listCircles: (mine = false) => req(`/circles${mine ? "?mine=true" : ""}`),
+  listDMs: () => req("/circles?dm=true"),
+  getLounge: () => req("/lounge"),
   getCircle: (id: string) => req(`/circles/${id}`),
   createCircle: (body: any) => req("/circles", { method: "POST", body: JSON.stringify(body) }),
   joinCircle: (id: string) => req(`/circles/${id}/join`, { method: "POST" }),
@@ -74,6 +76,17 @@ export const api = {
     req(`/circles/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
 
   listRecommendations: (q?: string) => req(`/recommendations${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+
+  // Connections (1:1)
+  requestConnection: (userId: string) => req(`/connections/${userId}`, { method: "POST" }),
+  listConnections: () => req("/connections"),
+  acceptConnection: (id: string) => req(`/connections/${id}/accept`, { method: "POST" }),
+  declineConnection: (id: string) => req(`/connections/${id}/decline`, { method: "POST" }),
+
+  // Weekend digest + reminders
+  weekendDigest: () => req("/digest/weekend"),
+  reminders: () => req("/reminders"),
+  dismissReminder: (eventId: string) => req(`/reminders/${eventId}/dismiss`, { method: "POST" }),
   createRecommendation: (body: any) =>
     req("/recommendations", { method: "POST", body: JSON.stringify(body) }),
 

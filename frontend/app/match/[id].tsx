@@ -21,6 +21,31 @@ export default function MatchDetail() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const [connecting, setConnecting] = useState(false);
+  const conn = data?.connection ?? { status: "none" };
+
+  const onConnect = async () => {
+    setConnecting(true);
+    try {
+      if (conn.status === "connected" && conn.circle_id) {
+        router.push(`/circle/${conn.circle_id}`);
+        return;
+      }
+      const r =
+        conn.status === "pending_in"
+          ? await api.acceptConnection(conn.id)
+          : await api.requestConnection(id!);
+      setData((d: any) => ({ ...d, connection: r.connection }));
+      if (r.connection.status === "connected" && r.connection.circle_id) {
+        router.push(`/circle/${r.connection.circle_id}`);
+      }
+    } catch {}
+    setConnecting(false);
+  };
+
+  const connectLabel =
+    conn.status === "connected" ? "Message" : conn.status === "pending_in" ? "Accept & chat" : conn.status === "pending_out" ? "Requested" : "Connect";
+
   if (!data) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}><Text style={{ padding: 24, color: colors.muted }}>Loading...</Text></SafeAreaView>;
   const u = data.user;
 
@@ -79,9 +104,29 @@ export default function MatchDetail() {
           </View>
         </View>
 
+        {conn.status === "pending_in" && (
+          <View style={styles.pendingNote}>
+            <Icon name="mail-unread-outline" size={16} color={colors.brandPrimary} />
+            <Text style={styles.pendingText}>{u.first_name} wants to connect with you</Text>
+          </View>
+        )}
+        {conn.status === "pending_out" && (
+          <View style={styles.pendingNote}>
+            <Icon name="time-outline" size={16} color={colors.muted} />
+            <Text style={[styles.pendingText, { color: colors.muted }]}>{`Request sent — you'll chat once ${u.first_name} connects back`}</Text>
+          </View>
+        )}
+
         <View style={{ padding: spacing.xl, flexDirection: "row", gap: spacing.md }}>
           <Button label="Maybe later" variant="secondary" onPress={() => router.back()} style={{ flex: 1 }} testID="match-later" />
-          <Button label="Connect" onPress={() => router.back()} style={{ flex: 1 }} testID="match-connect" />
+          <Button
+            label={connectLabel}
+            onPress={onConnect}
+            loading={connecting}
+            disabled={conn.status === "pending_out"}
+            style={{ flex: 1 }}
+            testID="match-connect"
+          />
         </View>
       </ScrollView>
     </View>
@@ -103,4 +148,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.onSurface, marginBottom: spacing.sm },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 20 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  pendingNote: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary },
+  pendingText: { color: colors.brandPrimary, fontSize: 13, fontWeight: "600", flex: 1 },
 });

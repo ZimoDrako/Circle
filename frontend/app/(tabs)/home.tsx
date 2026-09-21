@@ -17,26 +17,40 @@ export default function Home() {
   const [events, setEvents] = useState<any[]>([]);
   const [circles, setCircles] = useState<any[]>([]);
   const [recs, setRecs] = useState<any[]>([]);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [digest, setDigest] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [m, e, c, r] = await Promise.all([
+      const [m, e, c, r, rem, dg] = await Promise.all([
         api.getMatches(),
         api.listEvents(),
         api.listCircles(true),
         api.listRecommendations(),
+        api.reminders(),
+        api.weekendDigest(),
       ]);
       setMatches(m.matches || []);
       setEvents(e.events || []);
       setCircles(c.circles || []);
       setRecs(r.recommendations || []);
+      setReminders(rem.reminders || []);
+      setDigest(dg);
     } catch {}
     setRefreshing(false);
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const dismissReminder = async (eventId: string) => {
+    setReminders((r) => r.filter((x) => x.id !== eventId));
+    try { await api.dismissReminder(eventId); } catch {}
+  };
+
+  const fmtMins = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`);
+  const digestEvents = (digest?.days || []).flatMap((d: any) => d.events.map((e: any) => ({ ...e, dayLabel: d.label })));
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -57,6 +71,43 @@ export default function Home() {
             <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={44} />
           </Pressable>
         </View>
+
+        {reminders.map((r) => (
+          <Pressable key={r.id} testID={`reminder-${r.id}`} onPress={() => router.push(`/event/${r.id}`)} style={styles.reminder}>
+            <View style={styles.reminderIcon}><Icon name="alarm" size={20} color={colors.onBrandPrimary} /></View>
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.reminderTitle}>Starts in {fmtMins(r.starts_in_minutes)} · {r.title}</Text>
+              <Text style={styles.reminderMeta} numberOfLines={1}>{`${r.time} at ${r.location} — you're ${r.my_status === "going" ? "going" : "interested"} 🙌`}</Text>
+            </View>
+            <Pressable onPress={() => dismissReminder(r.id)} hitSlop={8} testID={`reminder-dismiss-${r.id}`}>
+              <Icon name="close" size={18} color={colors.onBrandPrimary} />
+            </Pressable>
+          </Pressable>
+        ))}
+
+        {digest && digest.total_events > 0 && (
+          <View style={styles.section}>
+            <Pressable testID="weekend-digest" onPress={() => router.push("/digest")} style={[styles.digest, digest.is_friday && styles.digestFriday]}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.digestKicker}>{digest.is_friday ? "FRIDAY DIGEST" : "WEEKEND DIGEST"} · {digest.weekend_label}</Text>
+                  <Text style={styles.digestTitle}>{digest.headline}</Text>
+                  <Text style={styles.digestMeta}>{digest.total_events} events Fri–Sun · tap to plan ahead</Text>
+                </View>
+                <Icon name="arrow-forward-circle" size={32} color={colors.brandPrimary} />
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, marginTop: spacing.md }}>
+                {digestEvents.slice(0, 6).map((e: any) => (
+                  <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={styles.digestChip}>
+                    <Text style={styles.digestChipDay}>{e.dayLabel.slice(0, 3).toUpperCase()} · {e.time}</Text>
+                    <Text numberOfLines={1} style={styles.digestChipTitle}>{e.title}</Text>
+                    {e.vibe_count > 0 && <Text style={styles.digestChipVibe}>{e.vibe_count} you vibe with going</Text>}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.section}>
           <SectionTitle title="Happening today" action="See all" onAction={() => router.push("/(tabs)/discover")} />
@@ -159,4 +210,17 @@ const styles = StyleSheet.create({
   recCat: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
   recTitle: { color: colors.onSurface, fontWeight: "700", fontSize: 14, marginTop: 2 },
   recCreator: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  reminder: { flexDirection: "row", alignItems: "center", marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandPrimary },
+  reminderIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
+  reminderTitle: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 14 },
+  reminderMeta: { color: colors.onBrandPrimary, fontSize: 12, marginTop: 2, opacity: 0.9 },
+  digest: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.brandTertiary, borderWidth: 1, borderColor: colors.border, marginTop: spacing.lg },
+  digestFriday: { borderColor: colors.brandPrimary, borderWidth: 2 },
+  digestKicker: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  digestTitle: { color: colors.onBrandTertiary, fontSize: 18, fontWeight: "800", marginTop: 4 },
+  digestMeta: { color: colors.onBrandTertiary, fontSize: 12, marginTop: 2, opacity: 0.8 },
+  digestChip: { width: 150, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface },
+  digestChipDay: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  digestChipTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "700", marginTop: 2 },
+  digestChipVibe: { color: colors.muted, fontSize: 10, marginTop: 2 },
 });

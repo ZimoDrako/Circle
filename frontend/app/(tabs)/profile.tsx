@@ -14,6 +14,15 @@ export default function Profile() {
   const router = useRouter();
   const [verifying, setVerifying] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
+  const [loungeId, setLoungeId] = useState<string | null>(null);
+  const [justUnlocked, setJustUnlocked] = useState(false);
+
+  const loadLounge = useCallback(async () => {
+    try {
+      const l = await api.getLounge();
+      setLoungeId(l.locked ? null : l.circle?.id ?? null);
+    } catch {}
+  }, []);
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -22,7 +31,8 @@ export default function Profile() {
         setCircleCount((r.circles || []).length);
       } catch {}
     })();
-  }, []));
+    loadLounge();
+  }, [loadLounge]));
 
   if (!user) return null;
 
@@ -42,6 +52,8 @@ export default function Profile() {
     try {
       await api.verifyStudent();
       await refresh();
+      await loadLounge();
+      setJustUnlocked(true);
     } finally {
       setVerifying(false);
     }
@@ -73,6 +85,17 @@ export default function Profile() {
             )}
           </View>
         </View>
+
+        {user.verified && loungeId && (
+          <Pressable testID="profile-lounge" onPress={() => router.push(`/circle/${loungeId}`)} style={styles.loungeRow}>
+            <View style={styles.loungeIcon}><Icon name="shield-checkmark" size={20} color={colors.onBrandPrimary} /></View>
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.loungeTitle}>{justUnlocked ? "Verified Lounge unlocked 🎉" : "Verified Lounge"}</Text>
+              <Text style={styles.loungeMeta}>Private chat for CSUF Verified Titans only</Text>
+            </View>
+            <Icon name="chevron-forward" size={20} color={colors.brandPrimary} />
+          </Pressable>
+        )}
 
         <View style={styles.statsRow}>
           <View style={styles.stat}>
@@ -130,6 +153,10 @@ const styles = StyleSheet.create({
   verifiedBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brandPrimary },
   verifiedText: { color: colors.onBrandPrimary, fontWeight: "700", fontSize: 12 },
   statsRow: { flexDirection: "row", padding: spacing.xl, gap: spacing.md },
+  loungeRow: { flexDirection: "row", alignItems: "center", marginHorizontal: spacing.xl, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandTertiary, borderWidth: 1, borderColor: colors.brandPrimary },
+  loungeIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
+  loungeTitle: { color: colors.onBrandTertiary, fontWeight: "700", fontSize: 14 },
+  loungeMeta: { color: colors.onBrandTertiary, fontSize: 12, marginTop: 2, opacity: 0.8 },
   stat: { flex: 1, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, alignItems: "center" },
   statNum: { fontSize: 22, fontWeight: "800", color: colors.brandPrimary },
   statLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },

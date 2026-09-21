@@ -304,3 +304,45 @@ async def seed_all(db, hash_password):
                 "system": False,
                 "created_at": (now - timedelta(hours=5 - i)).isoformat(),
             })
+
+
+
+async def seed_lounge(db):
+    """Private Verified Lounge — only visible to CSUF Verified students. Idempotent."""
+    if await db.circles.find_one({"is_lounge": True}):
+        return
+    now = datetime.now(timezone.utc)
+    verified = await db.users.find({"_demo": True, "verified": True}, {"id": 1, "first_name": 1}).to_list(50)
+    members = [u["id"] for u in verified[:10]]
+    cid = str(uuid.uuid4())
+    await db.circles.insert_one({
+        "_demo": True,
+        "id": cid,
+        "type": "group",
+        "name": "Verified Lounge",
+        "description": "A private space for CSUF Verified Titans only.",
+        "creator_id": members[0] if members else "system",
+        "member_ids": members,
+        "interests": ["Campus Life", "Titans", "Verified"],
+        "event_id": None,
+        "verified_only": True,
+        "is_lounge": True,
+        "created_at": now.isoformat(),
+    })
+    msgs = [
+        (None, "Welcome to the Verified Lounge — real Titans only ✓"),
+        (0, "finally a chat without randoms lol"),
+        (1, "anyone know if the library is open late this week?"),
+        (2, "yep till midnight during midterms"),
+    ]
+    for i, (idx, txt) in enumerate(msgs):
+        sender = "system" if idx is None or idx >= len(members) else members[idx]
+        await db.messages.insert_one({
+            "_demo": True,
+            "id": str(uuid.uuid4()),
+            "circle_id": cid,
+            "sender_id": sender,
+            "content": txt,
+            "system": sender == "system",
+            "created_at": (now - timedelta(hours=4 - i)).isoformat(),
+        })

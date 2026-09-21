@@ -16,8 +16,10 @@ import bcrypt
 import jwt
 import requests
 import random
+from zoneinfo import ZoneInfo
 
 ROOT_DIR = Path(__file__).parent
+CAMPUS_TZ = ZoneInfo("America/Los_Angeles")
 load_dotenv(ROOT_DIR / ".env")
 
 MONGO_URL = os.environ["MONGO_URL"]
@@ -184,6 +186,7 @@ class CircleCreateBody(BaseModel):
     interests: List[str] = []
     member_ids: List[str] = []
     event_id: Optional[str] = None
+    verified_only: bool = False
 
 
 class MessageBody(BaseModel):
@@ -394,6 +397,7 @@ async def get_user(user_id: str, user: dict = Depends(current_user)):
         "compatibility": score,
         "reasons": reasons,
         "shared_interests": shared,
+        "connection": await connection_state(user["id"], user_id),
     }
 
 
@@ -532,63 +536,104 @@ async def event_attendees(event_id: str, user: dict = Depends(current_user)):
 # ---------------------------------------------------------------------------
 # Routes: Circles
 # ---------------------------------------------------------------------------
-@api.post("/circles")
-async def create_circle(body: CircleCreateBody, user: dict = Depends(current_user)):
-    members = list({user["id"], *body.member_ids})
-    c = {
+def _dm_system_msg(circle_id: str, content: str) -> dict:
+    return {
         "id": str(uuid.uuid4()),
-        "name": body.name,
-        "creator_id": user["id"],
-        "member_ids": members,
-        "interests": body.interests,
-        "event_id": body.event_id,
+        "circle_id": circle_id,
+        "sender_id": "system",
+        "content": content,
+        "system": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.circles.insert_one(c)
-    # system message
-    await db.messages.insert_one(
-        {
-            "id": str(uuid.uuid4()),
-            "circle_id": c["id"],
-            "sender_id": "system",
-            "content": f"{user['first_name']} created this Circle",
-            "system": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-    )
-    c.pop("_id", None)
-    return {"circle": c}
 
 
-@api.get("/circles")
-async def list_circles(user: dict = Depends(current_user), mine: bool = False):
-    query: dict = {}
-    if mine:
-        query["member_ids"] = user["id"]
-    circles = await db.circles.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
-    # attach members
-    for c in circles:
-        members = await db.users.find(
-            {"id": {"$in": c["member_ids"]}}, {"_id": 0, "password_hash": 0}
-        ).to_list(50)
-        c["members"] = [public_user(m) for m in members]
-        c["is_member"] = user["id"] in c["member_ids"]
-        # shared interests with current user
-        user_int = set(user.get("interests") or [])
-        c["shared_with_you"] = list(user_int & set(c.get("interests") or []))
-    return {"circles": circles}
-
-
-@api.get("/circles/{circle_id}")
-async def get_circle(circle_id: str, user: dict = Depends(current_user)):
-    c = await db.circles.find_one({"id": circle_id}, {"_id": 0})
-    if not c:
-        raise HTTPException(404, "Not found")
+async def decorate_circle(c: dict, user: dict) -> dict:
     members = await db.users.find(
         {"id": {"$in": c["member_ids"]}}, {"_id": 0, "password_hash": 0}
     ).to_list(50)
     c["members"] = [public_user(m) for m in members]
     c["is_member"] = user["id"] in c["member_ids"]
+    c["verified_only"] = bool(c.get("verified_only"))
+    c["is_lounge"] = bool(c.get("is_lounge"))
+    c["type"] = c.get("type") or "group"
+    user_int = set(user.get("interests") or [])
+    c["shared_with_you"] = list(user_int & set(c.get("interests") or []))
+    if c["type"] == "dm":
+        other = next((m for m in c["members"] if m["id"] != user["id"]), None)
+        c["other_user"] = other
+        c["name"] = f"{other['first_name']} {other['last_name']}" if other else "Direct message"
+    return c
+
+
+def _circle_visibility(user: dict) -> dict:
+    return {} if user.get("verified") else {"verified_only": {"$ne": True}}
+
+
+@api.post("/circles")
+async def create_circle(body: CircleCreateBody, user: dict = Depends(current_user)):
+    if body.verified_only and not user.get("verified"):
+        raise HTTPException(403, "Only CSUF Verified students can create verified-only Circles")
+    members = list({user["id"], *body.member_ids})
+    c = {
+        "id": str(uuid.uuid4()),
+        "type": "group",
+        "name": body.name,
+        "creator_id": user["id"],
+        "member_ids": members,
+        "interests": body.interests,
+        "event_id": body.event_id,
+        "verified_only": body.verified_only,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.circles.insert_one(c)
+    await db.messages.insert_one(_dm_system_msg(c["id"], f"{user['first_name']} created this Circle"))
+    c.pop("_id", None)
+    return {"circle": c}
+
+
+@api.get("/circles")
+async def list_circles(user: dict = Depends(current_user), mine: bool = False, dm: bool = False):
+    query: dict = {**_circle_visibility(user)}
+    if dm:
+        query["type"] = "dm"
+        query["member_ids"] = user["id"]
+    else:
+        query["type"] = {"$ne": "dm"}
+        if mine:
+            query["member_ids"] = user["id"]
+    circles = await db.circles.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    for c in circles:
+        await decorate_circle(c, user)
+        if dm:
+            last = await db.messages.find_one(
+                {"circle_id": c["id"], "system": False}, {"_id": 0}, sort=[("created_at", -1)]
+            )
+            c["last_message"] = last
+    return {"circles": circles}
+
+
+@api.get("/lounge")
+async def verified_lounge(user: dict = Depends(current_user)):
+    """The private lounge only appears once a student is CSUF Verified. Verified users are auto-joined."""
+    lounge = await db.circles.find_one({"is_lounge": True}, {"_id": 0})
+    if not lounge:
+        return {"locked": True, "circle": None}
+    if not user.get("verified"):
+        return {"locked": True, "circle": None, "member_count": len(lounge["member_ids"])}
+    if user["id"] not in lounge["member_ids"]:
+        await db.circles.update_one({"id": lounge["id"]}, {"$addToSet": {"member_ids": user["id"]}})
+        await db.messages.insert_one(_dm_system_msg(lounge["id"], f"{user['first_name']} unlocked the lounge ✓"))
+        lounge = await db.circles.find_one({"is_lounge": True}, {"_id": 0})
+    await decorate_circle(lounge, user)
+    return {"locked": False, "circle": lounge, "member_count": len(lounge["member_ids"])}
+
+
+@api.get("/circles/{circle_id}")
+async def get_circle(circle_id: str, user: dict = Depends(current_user)):
+    c = await db.circles.find_one({"id": circle_id, **_circle_visibility(user)}, {"_id": 0})
+    if not c:
+        raise HTTPException(404, "Not found")
+    await decorate_circle(c, user)
     if c.get("event_id"):
         ev = await db.events.find_one({"id": c["event_id"]}, {"_id": 0})
         c["event"] = ev
@@ -600,18 +645,13 @@ async def join_circle(circle_id: str, user: dict = Depends(current_user)):
     c = await db.circles.find_one({"id": circle_id})
     if not c:
         raise HTTPException(404, "Not found")
+    if c.get("verified_only") and not user.get("verified"):
+        raise HTTPException(403, "CSUF Verified students only")
+    if c.get("type") == "dm":
+        raise HTTPException(403, "Direct messages are private")
     if user["id"] not in c["member_ids"]:
         await db.circles.update_one({"id": circle_id}, {"$addToSet": {"member_ids": user["id"]}})
-        await db.messages.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "circle_id": circle_id,
-                "sender_id": "system",
-                "content": f"{user['first_name']} joined the group",
-                "system": True,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        await db.messages.insert_one(_dm_system_msg(circle_id, f"{user['first_name']} joined the group"))
     return {"ok": True}
 
 
@@ -645,6 +685,8 @@ async def send_message(circle_id: str, body: MessageBody, user: dict = Depends(c
     c = await db.circles.find_one({"id": circle_id})
     if not c or user["id"] not in c["member_ids"]:
         raise HTTPException(403, "Not a member")
+    if c.get("verified_only") and not user.get("verified"):
+        raise HTTPException(403, "CSUF Verified students only")
     msg = {
         "id": str(uuid.uuid4()),
         "circle_id": circle_id,
@@ -657,6 +699,246 @@ async def send_message(circle_id: str, body: MessageBody, user: dict = Depends(c
     msg.pop("_id", None)
     msg["sender"] = public_user(user)
     return {"message": msg}
+
+
+# ---------------------------------------------------------------------------
+# Routes: Connections (1:1)
+# ---------------------------------------------------------------------------
+async def connection_state(me: str, other: str) -> dict:
+    c = await db.connections.find_one(
+        {
+            "status": {"$in": ["pending", "accepted"]},
+            "$or": [{"from_id": me, "to_id": other}, {"from_id": other, "to_id": me}],
+        },
+        {"_id": 0},
+    )
+    if not c:
+        return {"status": "none", "id": None, "circle_id": None}
+    if c["status"] == "accepted":
+        status = "connected"
+    else:
+        status = "pending_out" if c["from_id"] == me else "pending_in"
+    return {"status": status, "id": c["id"], "circle_id": c.get("circle_id")}
+
+
+async def _accept_connection(c: dict) -> dict:
+    a = await db.users.find_one({"id": c["from_id"]}, {"_id": 0, "password_hash": 0})
+    b = await db.users.find_one({"id": c["to_id"]}, {"_id": 0, "password_hash": 0})
+    shared = list(set((a or {}).get("interests") or []) & set((b or {}).get("interests") or []))
+    dm = {
+        "id": str(uuid.uuid4()),
+        "type": "dm",
+        "name": "Direct message",
+        "creator_id": c["from_id"],
+        "member_ids": [c["from_id"], c["to_id"]],
+        "interests": shared[:5],
+        "event_id": None,
+        "connection_id": c["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.circles.insert_one(dm)
+    intro = "You're connected! Say hi 👋"
+    if shared:
+        intro += f" — you both like {shared[0]}"
+    await db.messages.insert_one(_dm_system_msg(dm["id"], intro))
+    await db.connections.update_one(
+        {"id": c["id"]},
+        {"$set": {"status": "accepted", "circle_id": dm["id"], "accepted_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"status": "connected", "id": c["id"], "circle_id": dm["id"]}
+
+
+@api.post("/connections/{user_id}")
+async def request_connection(user_id: str, user: dict = Depends(current_user)):
+    if user_id == user["id"]:
+        raise HTTPException(400, "You can't connect with yourself")
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "User not found")
+    existing = await db.connections.find_one(
+        {
+            "status": {"$in": ["pending", "accepted"]},
+            "$or": [{"from_id": user["id"], "to_id": user_id}, {"from_id": user_id, "to_id": user["id"]}],
+        },
+        {"_id": 0},
+    )
+    if existing:
+        if existing["status"] == "pending" and existing["to_id"] == user["id"]:
+            # They already asked — tapping Connect is mutual, open the chat.
+            return {"connection": await _accept_connection(existing)}
+        return {"connection": await connection_state(user["id"], user_id)}
+    c = {
+        "id": str(uuid.uuid4()),
+        "from_id": user["id"],
+        "to_id": user_id,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.connections.insert_one(c)
+    return {"connection": {"status": "pending_out", "id": c["id"], "circle_id": None}}
+
+
+@api.get("/connections")
+async def list_connections(user: dict = Depends(current_user)):
+    conns = await db.connections.find(
+        {"status": {"$in": ["pending", "accepted"]}, "$or": [{"from_id": user["id"]}, {"to_id": user["id"]}]},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(300)
+    other_ids = list({c["to_id"] if c["from_id"] == user["id"] else c["from_id"] for c in conns})
+    users = await db.users.find({"id": {"$in": other_ids}}, {"_id": 0, "password_hash": 0}).to_list(300)
+    umap = {u["id"]: u for u in users}
+    incoming, outgoing, connected = [], [], []
+    for c in conns:
+        other_id = c["to_id"] if c["from_id"] == user["id"] else c["from_id"]
+        o = umap.get(other_id)
+        if not o:
+            continue
+        score, reasons = compatibility(user, o)
+        item = {"id": c["id"], "user": public_user(o), "compatibility": score, "reasons": reasons[:2],
+                "circle_id": c.get("circle_id"), "created_at": c["created_at"]}
+        if c["status"] == "accepted":
+            connected.append(item)
+        elif c["to_id"] == user["id"]:
+            incoming.append(item)
+        else:
+            outgoing.append(item)
+    return {"incoming": incoming, "outgoing": outgoing, "connected": connected}
+
+
+@api.post("/connections/{connection_id}/accept")
+async def accept_connection(connection_id: str, user: dict = Depends(current_user)):
+    c = await db.connections.find_one({"id": connection_id, "to_id": user["id"], "status": "pending"}, {"_id": 0})
+    if not c:
+        raise HTTPException(404, "Request not found")
+    return {"connection": await _accept_connection(c)}
+
+
+@api.post("/connections/{connection_id}/decline")
+async def decline_connection(connection_id: str, user: dict = Depends(current_user)):
+    r = await db.connections.update_one(
+        {"id": connection_id, "status": "pending", "$or": [{"to_id": user["id"]}, {"from_id": user["id"]}]},
+        {"$set": {"status": "declined"}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "Request not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Routes: Weekend digest + event reminders
+# ---------------------------------------------------------------------------
+def event_start(e: dict) -> Optional[datetime]:
+    raw = f"{e.get('date', '')} {(e.get('time') or '').strip().upper().replace('.', '')}"
+    for fmt in ("%Y-%m-%d %I:%M %p", "%Y-%m-%d %I%p", "%Y-%m-%d %I %p", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=CAMPUS_TZ)
+        except ValueError:
+            continue
+    return None
+
+
+async def _attach_event_meta(e: dict, user: dict):
+    e["interested_count"] = await db.event_attendees.count_documents(
+        {"event_id": e["id"], "status": {"$in": ["interested", "going"]}}
+    )
+    e["going_count"] = await db.event_attendees.count_documents({"event_id": e["id"], "status": "going"})
+    att = await db.event_attendees.find_one({"event_id": e["id"], "user_id": user["id"]}, {"_id": 0})
+    e["my_status"] = att["status"] if att else None
+
+
+@api.get("/digest/weekend")
+async def weekend_digest(user: dict = Depends(current_user)):
+    now = datetime.now(CAMPUS_TZ)
+    today = now.date()
+    wd = today.weekday()  # Mon=0 .. Sun=6
+    friday = today + timedelta(days=(4 - wd)) if wd <= 4 else today - timedelta(days=wd - 4)
+    days = [friday + timedelta(days=i) for i in range(3)]
+    day_strs = [d.strftime("%Y-%m-%d") for d in days if d >= today]
+    events = await db.events.find({"date": {"$in": day_strs}}, {"_id": 0}).sort("date", 1).to_list(200)
+    rolled = False
+    if wd >= 5 and not events:
+        # Weekend is wrapping up with nothing left — look ahead to next weekend.
+        rolled = True
+        friday = friday + timedelta(days=7)
+        days = [friday + timedelta(days=i) for i in range(3)]
+        day_strs = [d.strftime("%Y-%m-%d") for d in days]
+        events = await db.events.find({"date": {"$in": day_strs}}, {"_id": 0}).sort("date", 1).to_list(200)
+
+    # Who I vibe with (>=60) so the digest can say "3 people you match with are going"
+    others = await db.users.find({"id": {"$ne": user["id"]}, "onboarded": True}, {"_id": 0, "password_hash": 0}).to_list(500)
+    vibe_ids = {o["id"] for o in others if compatibility(user, o)[0] >= 60}
+
+    by_day: dict = {d: [] for d in day_strs}
+    for e in events:
+        await _attach_event_meta(e, user)
+        atts = await db.event_attendees.find({"event_id": e["id"]}, {"_id": 0, "user_id": 1}).to_list(500)
+        e["vibe_count"] = sum(1 for a in atts if a["user_id"] in vibe_ids)
+        by_day[e["date"]].append(e)
+
+    labels = {0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday", 4: "Friday", 5: "Saturday", 6: "Sunday"}
+    out_days = []
+    for d in days:
+        ds = d.strftime("%Y-%m-%d")
+        if ds not in by_day:
+            continue
+        evs = sorted(by_day[ds], key=lambda x: (event_start(x) or now).timestamp())
+        out_days.append({"date": ds, "label": labels[d.weekday()], "short": d.strftime("%b %d"), "events": evs})
+
+    total = sum(len(d["events"]) for d in out_days)
+    label = f"{days[0].strftime('%b %d')} – {days[2].strftime('%b %d')}"
+    return {
+        "is_friday": wd == 4,
+        "is_weekend": wd >= 4,
+        "weekend_label": label,
+        "total_events": total,
+        "headline": "Happy Friday! Here's your weekend" if wd == 4 else ("Next weekend on campus" if rolled else "This weekend on campus" if wd >= 5 else "Plan ahead: this weekend on campus"),
+        "days": out_days,
+    }
+
+
+REMINDER_WINDOW_MIN = 120
+
+
+@api.get("/reminders")
+async def upcoming_reminders(user: dict = Depends(current_user)):
+    """Events the user RSVPed to that start within the next 2 hours."""
+    now = datetime.now(CAMPUS_TZ)
+    atts = await db.event_attendees.find(
+        {"user_id": user["id"], "status": {"$in": ["going", "interested"]}}, {"_id": 0}
+    ).to_list(500)
+    if not atts:
+        return {"reminders": []}
+    ids = [a["event_id"] for a in atts]
+    status_map = {a["event_id"]: a["status"] for a in atts}
+    dismissed = {
+        d["event_id"]
+        for d in await db.reminder_dismissals.find({"user_id": user["id"]}, {"_id": 0, "event_id": 1}).to_list(500)
+    }
+    events = await db.events.find({"id": {"$in": ids}}, {"_id": 0}).to_list(500)
+    out = []
+    for e in events:
+        if e["id"] in dismissed:
+            continue
+        start = event_start(e)
+        if not start:
+            continue
+        mins = int((start - now).total_seconds() // 60)
+        if 0 <= mins <= REMINDER_WINDOW_MIN:
+            e["starts_in_minutes"] = mins
+            e["my_status"] = status_map.get(e["id"])
+            out.append(e)
+    out.sort(key=lambda x: x["starts_in_minutes"])
+    return {"reminders": out}
+
+
+@api.post("/reminders/{event_id}/dismiss")
+async def dismiss_reminder(event_id: str, user: dict = Depends(current_user)):
+    await db.reminder_dismissals.update_one(
+        {"user_id": user["id"], "event_id": event_id},
+        {"$set": {"user_id": user["id"], "event_id": event_id, "dismissed_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -810,13 +1092,14 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Seed demo data on startup
 # ---------------------------------------------------------------------------
-from seed_data import seed_all  # noqa: E402
+from seed_data import seed_all, seed_lounge  # noqa: E402
 
 
 @app.on_event("startup")
 async def on_start():
     try:
         await seed_all(db, hash_password)
+        await seed_lounge(db)
         logger.info("Seed check complete")
     except Exception as e:
         logger.error(f"Seed failed: {e}")

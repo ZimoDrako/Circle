@@ -14,12 +14,17 @@ CIRCLE is a mobile-first Expo/React Native app for CSUF students to discover peo
 - Group chat: polling every 4s, system messages, event pill at top.
 - Recommendations + Clubs (seeded), reports/block endpoints.
 - Uploads via Emergent Object Storage.
-- Seeded demo data (30 users, 15 events, 8 clubs, 5 recs, 3 Circles), idempotent.
+- Seeded demo data (30 users, 15 events, 8 clubs, 5 recs, 3 Circles + Verified Lounge), idempotent.
+- **Connection Requests (1:1):** Connect on a profile → request; when the other person connects back (or taps Accept in Circles → Messages) a private DM circle (`type: "dm"`) opens. Endpoints: `POST/GET /api/connections`, `/accept`, `/decline`, `GET /api/circles?dm=true`.
+- **Weekend Digest:** `GET /api/digest/weekend` (America/Los_Angeles) bundles Fri–Sun events by day with "N you vibe with going"; Home card (Friday gets emphasized "Friday digest") → `/digest` screen.
+- **Event Reminders (in-app):** `GET /api/reminders` returns RSVPed events starting within 2h; Home shows a dismissible nudge banner; event detail shows "We'll nudge you 2 hours before".
+- **Verified Only Circles:** `verified_only` circles are hidden/403 for unverified users. Seeded private "Verified Lounge" (`GET /api/lounge`) is locked until the student taps CSUF Verified, then auto-joins them; Circles tab shows a locked teaser vs. the open lounge card.
 
 ## Mocked
 - CSUF verify is one-tap simulated (no SSO).
 - Match reasons are deterministic (no AI).
 - Chat is polling, not websocket.
+- Event reminders are in-app nudges on Home (no push notifications).
 
 ## Tech
 Backend FastAPI + Motor. Frontend Expo Router 57, React 19, expo-image, expo-image-picker.

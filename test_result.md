@@ -101,3 +101,29 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+## Iteration 2 — Main agent (Connections, Weekend Digest, Event Reminders, Verified Lounge)
+backend:
+  - task: "Connections 1:1 (POST /api/connections/{user_id}, GET /api/connections, accept/decline; mutual tap auto-opens DM circle type=dm; GET /api/circles?dm=true; GET /api/users/{id}.connection)"
+    implemented: true
+    needs_retesting: true
+  - task: "Weekend digest GET /api/digest/weekend (Fri–Sun events grouped by day, vibe_count, headline; rolls to next weekend on Sat/Sun if empty)"
+    implemented: true
+    needs_retesting: true
+  - task: "Reminders GET /api/reminders (RSVPed events starting within 120 min, LA timezone), POST /api/reminders/{event_id}/dismiss"
+    implemented: true
+    needs_retesting: true
+  - task: "Verified Lounge GET /api/lounge (locked for unverified; auto-joins verified); verified_only circles hidden/403 for unverified"
+    implemented: true
+    needs_retesting: true
+frontend:
+  - task: "Match detail Connect button states (Connect / Requested / Accept & chat / Message)"
+    needs_retesting: true
+  - task: "Circles tab: Messages segment (requests accept/decline + DM list), Verified Lounge card (locked teaser vs open)"
+    needs_retesting: true
+  - task: "Home: reminder nudge banners, Weekend Digest card -> /digest screen"
+    needs_retesting: true
+  - task: "Profile: Verified Lounge row after verify"
+    needs_retesting: true
+agent_communication:
+  - agent: "main"
+    message: "Backend flows verified via python requests script (connect->mutual->DM, reminders window, lounge gating). Need E2E frontend + backend regression test."

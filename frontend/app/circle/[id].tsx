@@ -65,11 +65,20 @@ export default function CircleChat() {
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} testID="circle-back"><Icon name="chevron-back" size={26} color={colors.onSurface} /></Pressable>
           <View style={{ flex: 1, marginLeft: spacing.sm }}>
-            <Text style={styles.title} numberOfLines={1}>{circle.name}</Text>
-            <Text style={styles.meta}>{circle.member_ids.length} members</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={styles.title} numberOfLines={1}>{circle.name}</Text>
+              {circle.verified_only && <Icon name="shield-checkmark" size={14} color={colors.brandPrimary} />}
+            </View>
+            <Text style={styles.meta}>
+              {circle.type === "dm"
+                ? `${circle.other_user?.major || "CSUF"} · 1:1 chat`
+                : circle.verified_only
+                  ? `${circle.member_ids.length} verified Titans · private`
+                  : `${circle.member_ids.length} members`}
+            </Text>
           </View>
           <View style={styles.avatarStack}>
-            {circle.members.slice(0, 3).map((m: any, i: number) => (
+            {(circle.type === "dm" ? circle.members.filter((m: any) => m.id !== user?.id) : circle.members.slice(0, 3)).map((m: any, i: number) => (
               <View key={m.id} style={{ marginLeft: i === 0 ? 0 : -10, borderWidth: 2, borderColor: colors.surface, borderRadius: 999 }}>
                 <Avatar uri={m.profile_photo_url} name={m.first_name} size={28} />
               </View>
@@ -137,7 +146,7 @@ export default function CircleChat() {
             </Pressable>
           </View>
         </SafeAreaView>
-      ) : (
+      ) : circle.type === "dm" ? null : (
         <SafeAreaView edges={["bottom"]} style={styles.inputWrap}>
           <Pressable onPress={join} style={styles.joinBtn} testID="circle-join">
             <Text style={styles.joinText}>Join this Circle</Text>

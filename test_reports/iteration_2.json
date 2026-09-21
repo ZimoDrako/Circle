@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 2 tests the 4 new features (Connections/DM, Weekend Digest, Reminders, Verified Lounge) plus regression. Backend: 26/26 pytest PASS (9 new-feature + 17 regression). Frontend E2E on mobile viewport (390x844) PASSES all critical flows: weekend-digest card visible on Home with kicker+headline+event chips, tapping opens /digest with day labels + 2 digest-rsvp buttons + digest-back working; Circles tab shows all three chips (circles-tab-mine/messages/all); demo0 sees an unlocked lounge-card 'Verified Lounge · VERIFIED ONLY · 11 verified Titans · private lounge', tapping opens the lounge chat and a message send succeeds; Messages chip shows one DM (from backend-created demo0<->demo1 connection), tapping opens the 1:1 chat and message send works; match-connect flow works — tapping Connect on a match/[id] flips button to 'Requested' and displays 'Request sent'; Profile shows CSUF Verified badge and profile-lounge row for demo0. Backend connection state, LA-tz aware digest headline, reminders 2-hour window + dismiss, unverified lockout (404 on /circles/{lounge_id}, 403 on join, hidden from /circles list, 403 on verified_only create), and verify-flow auto-unlock all pass. No React Native red screens or deprecated packages detected. Note on digest days: today (LA) is Sunday Sep 20 so only Sunday label is rendered on /digest — correct per code (filters d >= today).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/test_circle_api.py",
+    "/app/test_reports/pytest/new_features.xml",
+    "/app/test_reports/pytest/regression.xml"
+  ],
+  "action_items": [
+    "Optional: consider deleting TEST-created events (backend test creates two 'TEST reminder event' / 'TEST far event' entries used to validate the reminder window). They currently persist because there's no DELETE /api/events endpoint. Consider adding one, or use a dedicated collection cleanup fixture.",
+    "server.py is now 1110 lines — still exceeds the 700-line guideline; consider splitting into routers (auth/events/circles/connections/digest) for maintainability. Not blocking.",
+    "Home 'reminder-{id}' banner not visually verified in this run because the test event created by the backend test was dismissed as part of the backend flow. To visually verify frontend, main agent can manually RSVP going to an event ~90 min out (LA tz) and refresh Home."
+  ],
+  "critical_code_review_comments": [
+    "Auth, JWT, bcrypt look correct; MongoDB _id excluded on all reads; load_dotenv called before env reads.",
+    "connection_state / _accept_connection correctly guard against duplicate connections and self-connect; DM name resolved from the *other* member so both sides see the counterpart's name.",
+    "GET /api/lounge auto-joins verified users via $addToSet; unverified path returns locked=true and hides the circle from list_circles via _circle_visibility. Correct behavior.",
+    "weekend_digest correctly rolls to next weekend when Sat/Sun has no remaining events, and uses America/Los_Angeles for 'now'. Headlines match spec.",
+    "REMINDER_WINDOW_MIN = 120 min; event_start parses '7:30 PM', '7PM', '7 PM', and 24h HH:MM — solid.",
+    "GET /api/circles?dm=true attaches last_message; ?mine=true excludes dm circles via type != dm — correct.",
+    "app/(tabs)/circles.tsx: testIDs all match spec (lounge-card, lounge-locked, circles-tab-mine|messages|all, request-{id}, request-accept-{id}, request-decline-{id}, dm-card-{id}).",
+    "app/(tabs)/home.tsx: testIDs match spec (weekend-digest, reminder-{id}, reminder-dismiss-{id}, home-match-{id}, home-event-{id})."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/iteration_2.json",
+    "/app/test_reports/pytest/new_features.xml",
+    "/app/test_reports/pytest/regression.xml"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "100% of tested flows (home digest+digest screen+back, circles chips, verified lounge open+message send, DM open+message send, match connect flow -> Requested, profile verified badge + profile-lounge row)"},
+  "seed_data_creation": "Backend test created two TEST_ events (reminder-window + far), one signup test_verify_* user for the verify-flow lounge unlock test, and demo0<->demo1 / demo2<->demo3 connections. RSVPs on TEST events were cleared but the event docs remain in Mongo (no delete endpoint).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests: run `pytest backend/tests/ -v`. All flows use LA tz — when creating reminder-window test events, use datetime.now(ZoneInfo('America/Los_Angeles')) and format time as '%I:%M %p' with leading-zero stripped ('7:30 PM'). Existing DM circle between demo0 and demo1 already exists from this run (connected status). Weekend digest 'days' array only contains dates >= today (LA), so on Sunday only 'Sunday' label appears; on Friday all three appear. Verified demo0 already in lounge from this run. Demo1/demo3 are unverified. All key testIDs verified in circles.tsx, home.tsx, and confirmed via UI script. Frontend testIDs live: welcome-login-button, login-email/password/submit, home-match-{id}, home-event-{id}, weekend-digest, reminder-{id}, reminder-dismiss-{id}, circles-tab-mine/messages/all, lounge-card, lounge-locked, dm-card-{id}, request-{id}, request-accept-{id}, request-decline-{id}, circle-input, circle-send, match-connect, digest-back, digest-rsvp-{id}, profile-signout, profile-lounge, verify-student.",
+  "rca_of_issue": "N/A - all specified tests passed."
+}

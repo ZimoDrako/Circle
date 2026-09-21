@@ -110,6 +110,13 @@ export default function EventDetail() {
             />
           </View>
 
+          {event.my_status && (
+            <View style={styles.reminderNote} testID="event-reminder-note">
+              <Icon name="alarm-outline" size={16} color={colors.brandPrimary} />
+              <Text style={styles.reminderText}>{"We'll nudge you on Home 2 hours before this starts."}</Text>
+            </View>
+          )}
+
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.desc}>{event.description}</Text>
 
@@ -182,6 +189,8 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 20, fontWeight: "800", color: colors.brandPrimary },
   statLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
   rsvpRow: { flexDirection: "row" },
+  reminderNote: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md, padding: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandTertiary },
+  reminderText: { color: colors.onBrandTertiary, fontSize: 12, fontWeight: "600", flex: 1 },
   sectionTitle: { fontSize: 18, fontWeight: "700", color: colors.onSurface, marginTop: spacing.xl },
   sub: { color: colors.muted, marginTop: 4, fontSize: 13 },
   desc: { color: colors.onSurfaceSecondary, marginTop: spacing.sm, fontSize: 14, lineHeight: 21 },
