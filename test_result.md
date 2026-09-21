@@ -127,3 +127,22 @@ frontend:
 agent_communication:
   - agent: "main"
     message: "Backend flows verified via python requests script (connect->mutual->DM, reminders window, lounge gating). Need E2E frontend + backend regression test."
+
+## Iteration 3 — Security hardening (after security audit)
+backend:
+  - task: "SEC-001 JWT_SECRET rotated to strong random (old tokens invalid; users must re-login)"
+    needs_retesting: true
+  - task: "SEC-002 GET /circles/{id}/messages requires membership (403 otherwise); GET /circles/{id} for DM requires membership (404 otherwise); group circles still previewable for non-members so Join works"
+    needs_retesting: true
+  - task: "SEC-003 /upload allow-lists image content types (415 otherwise), 10MB cap (413); /files served with stored allow-listed content type + nosniff"
+    needs_retesting: true
+  - task: "SEC-004 search q re.escape'd + max_length=80 on /users, /events, /recommendations"
+    needs_retesting: true
+  - task: "Hardening: signup password min 8 (422), message max 2000, auth rate limit 30/min/IP (429), security headers, CORS allow_credentials=False"
+    needs_retesting: true
+frontend:
+  - task: "signup shows 'Password must be at least 8 characters'; api.ts maps 422 detail arrays to readable message; circle chat empty state says 'Join this Circle to see the conversation' for non-members"
+    needs_retesting: true
+agent_communication:
+  - agent: "main"
+    message: "Verified locally via python: 403 non-member messages, 415 html upload, 422 short pw, 429 rate limit, headers present. Need regression of full app (auth, circles join flow, DM, lounge, uploads) after hardening."

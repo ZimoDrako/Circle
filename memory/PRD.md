@@ -28,3 +28,10 @@ CIRCLE is a mobile-first Expo/React Native app for CSUF students to discover peo
 
 ## Tech
 Backend FastAPI + Motor. Frontend Expo Router 57, React 19, expo-image, expo-image-picker.
+
+## Security (audited)
+- JWT secret is a strong random value in backend/.env (set a fresh one per deployment); 30-day tokens.
+- Circle messages require membership; DMs are invisible to non-members. Verified-only circles hidden/403 for unverified users.
+- Uploads: image types only, 10 MB cap, served with stored content type + nosniff.
+- Search terms regex-escaped and length-capped; password ≥ 8 chars; messages ≤ 2000 chars; auth endpoints rate-limited 30/min/IP; security headers on all responses.
+- Accepted for MVP: file URLs carry `?token=` (needed for `expo-image`), CORS `*` without credentials.

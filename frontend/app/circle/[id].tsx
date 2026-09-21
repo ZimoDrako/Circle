@@ -108,8 +108,8 @@ export default function CircleChat() {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
-            <Icon name="chatbubbles-outline" size={40} color={colors.muted} />
-            <Text style={{ color: colors.muted, marginTop: 12 }}>Say hi to your new Circle</Text>
+            <Icon name={circle.is_member ? "chatbubbles-outline" : "lock-closed-outline"} size={40} color={colors.muted} />
+            <Text style={{ color: colors.muted, marginTop: 12 }}>{circle.is_member ? "Say hi to your new Circle" : "Join this Circle to see the conversation"}</Text>
           </View>
         }
         renderItem={({ item: m }) => {

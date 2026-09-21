@@ -29,7 +29,8 @@ async function req(path: string, opts: RequestInit = {}) {
     let msg = `HTTP ${res.status}`;
     try {
       const j = await res.json();
-      msg = j.detail || msg;
+      if (Array.isArray(j.detail)) msg = j.detail[0]?.msg?.replace(/^Value error, /, "") || msg;
+      else msg = j.detail || msg;
     } catch {}
     throw new Error(msg);
   }

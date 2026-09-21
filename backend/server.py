@@ -1,5 +1,5 @@
 """CIRCLE - Campus social discovery MVP backend."""
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Header, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Header, Query, Request
 from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
@@ -16,6 +16,7 @@ import bcrypt
 import jwt
 import requests
 import random
+import re
 from zoneinfo import ZoneInfo
 
 ROOT_DIR = Path(__file__).parent
@@ -87,6 +88,20 @@ def _get_object_sync(path: str) -> tuple[bytes, str]:
 # ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
+_auth_attempts: dict = {}  # ip -> [timestamps]
+AUTH_RATE_LIMIT = 30  # attempts per minute per IP
+
+
+def rate_limit_auth(request: Request):
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0].strip()
+    now = datetime.now(timezone.utc).timestamp()
+    hits = [t for t in _auth_attempts.get(ip, []) if now - t < 60]
+    if len(hits) >= AUTH_RATE_LIMIT:
+        raise HTTPException(429, "Too many attempts. Try again in a minute.")
+    hits.append(now)
+    _auth_attempts[ip] = hits
+
+
 def hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
@@ -131,10 +146,10 @@ async def optional_user(authorization: Optional[str] = Header(None)) -> Optional
 # Models
 # ---------------------------------------------------------------------------
 class SignUpBody(BaseModel):
-    first_name: str
-    last_name: str
+    first_name: str = Field(min_length=1, max_length=60)
+    last_name: str = Field(min_length=1, max_length=60)
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=128)
     date_of_birth: str  # ISO date
     university: str = "California State University, Fullerton"
 
@@ -190,7 +205,7 @@ class CircleCreateBody(BaseModel):
 
 
 class MessageBody(BaseModel):
-    content: str
+    content: str = Field(min_length=1, max_length=2000)
 
 
 class ReportBody(BaseModel):
@@ -301,7 +316,7 @@ def public_user(u: dict) -> dict:
 # Routes: Auth
 # ---------------------------------------------------------------------------
 @api.post("/auth/signup")
-async def signup(body: SignUpBody):
+async def signup(body: SignUpBody, _: None = Depends(rate_limit_auth)):
     existing = await db.users.find_one({"email": body.email.lower()})
     if existing:
         raise HTTPException(400, "Email already registered")
@@ -329,7 +344,7 @@ async def signup(body: SignUpBody):
 
 
 @api.post("/auth/login")
-async def login(body: LoginBody):
+async def login(body: LoginBody, _: None = Depends(rate_limit_auth)):
     u = await db.users.find_one({"email": body.email.lower()})
     if not u or not verify_password(body.password, u.get("password_hash", "")):
         raise HTTPException(401, "Invalid credentials")
@@ -402,13 +417,13 @@ async def get_user(user_id: str, user: dict = Depends(current_user)):
 
 
 @api.get("/users")
-async def list_users(user: dict = Depends(current_user), q: Optional[str] = None):
+async def list_users(user: dict = Depends(current_user), q: Optional[str] = Query(None, max_length=80)):
     query: dict = {"id": {"$ne": user["id"]}, "onboarded": True}
     if q:
         query["$or"] = [
-            {"first_name": {"$regex": q, "$options": "i"}},
-            {"last_name": {"$regex": q, "$options": "i"}},
-            {"major": {"$regex": q, "$options": "i"}},
+            {"first_name": {"$regex": re.escape(q), "$options": "i"}},
+            {"last_name": {"$regex": re.escape(q), "$options": "i"}},
+            {"major": {"$regex": re.escape(q), "$options": "i"}},
         ]
     users = await db.users.find(query, {"_id": 0, "password_hash": 0}).to_list(200)
     return {"users": [public_user(u) for u in users]}
@@ -435,16 +450,16 @@ async def create_event(body: EventCreateBody, user: dict = Depends(current_user)
 async def list_events(
     user: Optional[dict] = Depends(optional_user),
     category: Optional[str] = None,
-    q: Optional[str] = None,
+    q: Optional[str] = Query(None, max_length=80),
 ):
     query: dict = {}
     if category:
         query["category"] = category
     if q:
         query["$or"] = [
-            {"title": {"$regex": q, "$options": "i"}},
-            {"description": {"$regex": q, "$options": "i"}},
-            {"tags": {"$regex": q, "$options": "i"}},
+            {"title": {"$regex": re.escape(q), "$options": "i"}},
+            {"description": {"$regex": re.escape(q), "$options": "i"}},
+            {"tags": {"$regex": re.escape(q), "$options": "i"}},
         ]
     events = await db.events.find(query, {"_id": 0}).sort("date", 1).to_list(200)
     # attach counts
@@ -633,6 +648,8 @@ async def get_circle(circle_id: str, user: dict = Depends(current_user)):
     c = await db.circles.find_one({"id": circle_id, **_circle_visibility(user)}, {"_id": 0})
     if not c:
         raise HTTPException(404, "Not found")
+    if c.get("type") == "dm" and user["id"] not in c["member_ids"]:
+        raise HTTPException(404, "Not found")
     await decorate_circle(c, user)
     if c.get("event_id"):
         ev = await db.events.find_one({"id": c["event_id"]}, {"_id": 0})
@@ -663,6 +680,11 @@ async def leave_circle(circle_id: str, user: dict = Depends(current_user)):
 
 @api.get("/circles/{circle_id}/messages")
 async def circle_messages(circle_id: str, user: dict = Depends(current_user), since: Optional[str] = None):
+    c = await db.circles.find_one({"id": circle_id}, {"_id": 0, "member_ids": 1})
+    if not c:
+        raise HTTPException(404, "Not found")
+    if user["id"] not in c["member_ids"]:
+        raise HTTPException(403, "Join this Circle to see messages")
     query: dict = {"circle_id": circle_id}
     if since:
         query["created_at"] = {"$gt": since}
@@ -961,12 +983,12 @@ async def create_recommendation(body: RecommendationCreateBody, user: dict = Dep
 
 
 @api.get("/recommendations")
-async def list_recommendations(q: Optional[str] = None):
+async def list_recommendations(q: Optional[str] = Query(None, max_length=80)):
     query: dict = {}
     if q:
         query["$or"] = [
-            {"title": {"$regex": q, "$options": "i"}},
-            {"description": {"$regex": q, "$options": "i"}},
+            {"title": {"$regex": re.escape(q), "$options": "i"}},
+            {"description": {"$regex": re.escape(q), "$options": "i"}},
         ]
     recs = await db.recommendations.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
     return {"recommendations": recs}
@@ -1017,13 +1039,30 @@ async def block_user(user_id: str, user: dict = Depends(current_user)):
 # ---------------------------------------------------------------------------
 # Uploads (Emergent Object Storage)
 # ---------------------------------------------------------------------------
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/heic": "heic",
+    "image/heif": "heif",
+}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
 @api.post("/upload")
 async def upload_file(file: UploadFile = File(...), user: dict = Depends(current_user)):
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
-    key = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{ext}"
-    data = await file.read()
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(415, "Only JPEG, PNG, WEBP, GIF or HEIC images are allowed")
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Image must be under 10 MB")
+    if not data:
+        raise HTTPException(400, "Empty file")
+    key = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{ALLOWED_IMAGE_TYPES[content_type]}"
     try:
-        await run_in_threadpool(_put_object_sync, key, data, file.content_type or "application/octet-stream")
+        await run_in_threadpool(_put_object_sync, key, data, content_type)
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else 500
         if code == 402:
@@ -1033,7 +1072,7 @@ async def upload_file(file: UploadFile = File(...), user: dict = Depends(current
         {
             "path": key,
             "owner_id": user["id"],
-            "content_type": file.content_type,
+            "content_type": content_type,
             "size": len(data),
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -1064,10 +1103,16 @@ async def download_file(path: str, token: Optional[str] = None, authorization: O
     if not meta:
         raise HTTPException(404, "Not found")
     try:
-        content, ct = await run_in_threadpool(_get_object_sync, path)
+        content, _ct = await run_in_threadpool(_get_object_sync, path)
     except Exception:
         raise HTTPException(500, "Read failed")
-    return Response(content=content, media_type=ct)
+    # Serve with the allow-listed type recorded at upload, never the caller-influenced one.
+    safe_ct = meta.get("content_type") if meta.get("content_type") in ALLOWED_IMAGE_TYPES else "application/octet-stream"
+    return Response(
+        content=content,
+        media_type=safe_ct,
+        headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": "inline", "Cache-Control": "private, max-age=3600"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1082,11 +1127,21 @@ app.include_router(api)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,  # bearer tokens only; no cookies — safe with wildcard origins
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return resp
 
 
 # ---------------------------------------------------------------------------

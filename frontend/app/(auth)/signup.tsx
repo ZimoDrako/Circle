@@ -25,6 +25,10 @@ export default function SignUp() {
       setErr("Please fill everything");
       return;
     }
+    if (password.length < 8) {
+      setErr("Password must be at least 8 characters");
+      return;
+    }
     setLoading(true);
     try {
       const r = await api.signup({

@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 3 validates the SEC-002/003/004 fixes and hardening (password min-length, message length, security headers, auth rate limit) plus a quick regression on demo0's core flows. Backend: 21/21 pytest PASS in /app/backend/tests/test_security_hardening.py (serial run with -n 0 because the rate-limit test blocks parallel logins from the same IP). Frontend E2E on 390x844 mobile viewport: existing JWT invalidated by secret rotation lands on Welcome as expected; login demo0 -> Home renders weekend-digest + 'Happening today'; Circles -> Discover shows circle-card ids, opening non-member circle 'Titan Ballers' shows lock icon + 'Join this Circle to see the conversation' + circle-join button, tapping join reveals circle-input + circle-send and a sent message ('TEST hi pw') renders; Your Circles shows lounge-card and opening it renders the Verified Lounge chat with existing messages + send; Signup with password 'abc' shows the 'Password must be at least 8 characters' error; Profile -> profile-signout returns to Welcome. No React Native red screens or deprecated packages detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_security_hardening.py",
+    "/app/test_reports/pytest/security.xml"
+  ],
+  "action_items": [
+    "Optional: register the custom 'order' mark (or drop it) — the TestZZZRateLimit class already runs last via alphabetical class ordering, and pytest emits a PytestUnknownMarkWarning for @pytest.mark.order('last'). Not blocking.",
+    "server.py is now 1166 lines (>700). Still worth splitting into routers (auth/events/circles/connections/digest/uploads) for maintainability. Not blocking."
+  ],
+  "critical_code_review_comments": [
+    "SEC-002: get_circle correctly returns 404 for DMs the caller isn't in via `if c.get('type') == 'dm' and user['id'] not in c['member_ids']: 404`; verified_only visibility filter also applied via _circle_visibility. circle_messages returns 403 (not 404) when caller isn't a member — matches the spec.",
+    "SEC-003: /api/upload validates content-type against a strict allowlist (jpeg/png/webp/gif/heic/heif) -> 415 for text/html; MAX_UPLOAD_BYTES=10MB; /api/files/{path} requires JWT via bearer OR ?token=, serves with the *recorded* content_type from the upload doc (not caller-influenced), and forces X-Content-Type-Options: nosniff + Content-Disposition: inline + private cache.",
+    "SEC-004: All search endpoints (/api/events, /api/users, /api/recommendations) now wrap `q` with re.escape() and cap `q` at max_length=80 via Query(..., max_length=80) — 81 chars returns 422; the classic ReDoS payload '(a+)+$' and regex metachars '.*' and '[' are treated as literals and return 200.",
+    "Hardening: SignUpBody password Field(min_length=8, max_length=128) -> 422 for short passwords; MessageBody content Field(min_length=1, max_length=2000) -> 422 for 2001 chars; global security_headers middleware sets X-Content-Type-Options, X-Frame-Options=DENY, Referrer-Policy=no-referrer, Strict-Transport-Security on every response including /api/health.",
+    "Rate limit: rate_limit_auth dependency on /auth/signup and /auth/login uses an in-memory sliding window (30/min/IP) with x-forwarded-for parsing. Verified 429 within 45 attempts. Note: in-memory means single-process; if backend is scaled horizontally, per-instance limits apply — flag for prod hardening but acceptable for demo.",
+    "CORS: allow_credentials=False with allow_origins=['*'] is safe because auth uses bearer tokens only (no cookies).",
+    "Frontend signup.tsx correctly guards password.length < 8 client-side with the exact spec error string, and shows the error inline (styles.err)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_security_hardening.py",
+    "/app/test_reports/pytest/security.xml",
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% of tested flows (welcome->login->home digest, circles->discover->non-member preview+join+send, your circles->lounge open, signup password error, profile signout)"},
+  "seed_data_creation": "No new seed data. The membership test used an existing non-member group 'Titan Ballers' for demo0 (created earlier). Frontend join flow added demo0 to 'Titan Ballers' (member count went 7 -> 8). Upload tests created two small PNG blobs in emergent storage under demo0's uploads/. Signup hardening test created one test_pw_* user with a valid password.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend: run `cd /app/backend && python -m pytest tests/test_security_hardening.py -n 0` — MUST be serial because TestZZZRateLimit exhausts the 30/min/IP window and would block parallel workers' logins. If you need to re-run, wait ~60s between attempts so the sliding-window resets. Frontend: token key is 'circle.token' in AsyncStorage/localStorage; on web preview navigating between tabs works better via absolute URLs (/circles, /profile, etc.) than clicking the tab bar because tab items lack testIDs and the tab labels collide with in-page section titles. Non-member circles for demo0 are exhausted quickly if the join test is re-run — either create a fresh one via demo1's token (POST /api/circles with member_ids: []) or reuse the join flow on a demo1-created circle.",
+  "rca_of_issue": "N/A - all security fixes and regressions passed. Two intermediate test failures during development were: (1) my initial assertion checked r.json()['user']['email'] but public_user() intentionally omits email (fixed by comparing user['id'] round-trip), and (2) parallel pytest-xdist workers hit 429 because the rate-limit test shares the same IP — resolved by running `-n 0` serially."
+}
