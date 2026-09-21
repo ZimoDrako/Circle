@@ -50,7 +50,8 @@ setColorScheme?.(themes.dark ? null : defaultScheme);
 
 export function useTheme(): { scheme: ColorScheme; colors: ThemeColors } {
   const system = useColorScheme();
-const scheme: ColorScheme = system === "dark" ? "dark" : "light";  return { scheme, colors: themes[scheme] ?? themes.light };
+  const scheme: ColorScheme = system === "dark" && themes.dark ? "dark" : "light";
+  return { scheme, colors: themes[scheme] ?? themes.light };
 }
 
 export function makeStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
