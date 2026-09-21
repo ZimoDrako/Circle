@@ -1,0 +1,242 @@
+{
+  "app_name": "CIRCLE",
+  "personality": "1 iOS-Native Clean (Fused with Tactile structural playfulness for Gen Z)",
+  "personality_one_liner": "A premium, welcoming, energetic, and clean campus social space driven by structural clarity and vibrant organic accents, avoiding algorithm-driven clutter.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#09090B",
+    "surfaceSecondary": "#F4F4F5",
+    "onSurfaceSecondary": "#18181B",
+    "surfaceTertiary": "#E4E4E7",
+    "onSurfaceTertiary": "#27272A",
+    "surfaceInverse": "#18181B",
+    "onSurfaceInverse": "#FAFAFA",
+    "brand": "#10B981",
+    "brandPrimary": "#10B981",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#34D399",
+    "onBrandSecondary": "#064E3B",
+    "brandTertiary": "#D1FAE5",
+    "onBrandTertiary": "#065F46",
+    "success": "#10B981",
+    "onSuccess": "#FFFFFF",
+    "warning": "#F59E0B",
+    "onWarning": "#FFFFFF",
+    "error": "#EF4444",
+    "onError": "#FFFFFF",
+    "info": "#3F3F46",
+    "onInfo": "#FFFFFF",
+    "border": "#E4E4E7",
+    "borderStrong": "#A1A1AA",
+    "divider": "#F4F4F5",
+    "muted": "#71717A",
+    "onBrand": "#FFFFFF"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room. Cards never flush to edge, always md/lg margins. 24px padding at screen roots.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Bottom tab bar background",
+      "Sticky headers when scrolled",
+      "Featured event cards over imagery",
+      "Bottom-sheet handles"
+    ],
+    "dont's": [
+      "Standard buttons",
+      "List rows",
+      "Form inputs",
+      "Without >70% base tint"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "haptics": {
+    "events": {
+      "button_press": "light",
+      "tab_change": "light",
+      "match_success": "success",
+      "toggle_switch": "selection",
+      "circle_join": "medium"
+    }
+  },
+  "screens": [
+    {
+      "name": "Auth (SignUp / Login)",
+      "purpose": "Welcoming entry point with campus backdrop and clean auth fields.",
+      "states": {
+        "loading": "Spinner in CTA button",
+        "empty": "N/A",
+        "error": "Inline text below input or subtle error toast"
+      },
+      "layout": "Full-bleed background image with top-down 80% surfaceInverse scrim. Large display wordmark. White/surface solid bottom sheet card holding the auth inputs and sticky CTA."
+    },
+    {
+      "name": "Onboarding (Steps 1-7)",
+      "purpose": "Multi-step flow capturing interests, personality sliders, and photo without feeling tedious.",
+      "states": {
+        "loading": "Skeleton placeholders for interest chips",
+        "empty": "N/A",
+        "error": "Error toast if photo upload fails"
+      },
+      "layout": "Top progress bar. Large typography for questions. Use wrap grid of pill-shaped chips for interests (brandTertiary for selected). Sticky 'Continue' CTA at bottom."
+    },
+    {
+      "name": "Home",
+      "purpose": "Personalized dashboard highlighting today's events, potential matches, and active circles.",
+      "states": {
+        "loading": "Skeleton cards for matches and events",
+        "empty": "Illustration of students, 'Your campus is quiet today. Create an event!'",
+        "error": "Subtle retry button centered in section"
+      },
+      "layout": "Vertical scroll. Sections with large titles (2xl). Horizontal flatlists for 'Match Cards' (large image + compatibility % badge) and 'Circles'. Event cards are full-width minus padding."
+    },
+    {
+      "name": "Discover (People, Events, Clubs, Recommendations)",
+      "purpose": "Explore the campus directory across multiple domains.",
+      "states": {
+        "loading": "Skeleton grid",
+        "empty": "Empty state illustration + CTA to change filters",
+        "error": "Standard error view with retry"
+      },
+      "layout": "Sticky glassmorphic top header with segmented control. 2-column flex-wrap grid for People and Clubs (justifyContent space-between). Single column list for Events."
+    },
+    {
+      "name": "Circles List",
+      "purpose": "Browse and join small social groups.",
+      "states": {
+        "loading": "Skeleton list items",
+        "empty": "Empty state art + 'Start a new Circle' CTA",
+        "error": "Standard error view"
+      },
+      "layout": "Vertical list. Cards have surfaceSecondary bg, overlapping avatars row, bold title, and a 'Join' pill button."
+    },
+    {
+      "name": "Circle Detail & Chat",
+      "purpose": "Group coordination and conversation.",
+      "states": {
+        "loading": "Skeleton messages",
+        "empty": "'Say hi to your new Circle!' graphic",
+        "error": "Failed to send indicator on message bubble"
+      },
+      "layout": "Glass header with group info and avatars. Chat bubbles with rounded corners (brandPrimary for self, surfaceTertiary for others). Sticky bottom input field in KeyboardAvoidingView."
+    },
+    {
+      "name": "Event Detail",
+      "purpose": "Deep dive on event info and finding people to attend with.",
+      "states": {
+        "loading": "Full screen skeleton",
+        "empty": "N/A",
+        "error": "Toast on failed RSVP"
+      },
+      "layout": "Full-bleed hero image. Overlapping content sheet with xl padding. Sticky glassmorphic bottom bar holding the 'Find People to Go With' primary CTA."
+    },
+    {
+      "name": "Match Detail",
+      "purpose": "Explains why two people matched and facilitates connection.",
+      "states": {
+        "loading": "Animated radar/connection UI",
+        "empty": "N/A",
+        "error": "Error loading details"
+      },
+      "layout": "Large avatar on top half. 'Why you match' explanation blocks (surfaceSecondary chips). Sticky 'Say Hi' CTA at the bottom."
+    },
+    {
+      "name": "Create Menu",
+      "purpose": "Action sheet to create an event, hangout, or circle.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Bottom sheet or modal. Large tactile touch targets (md radius) with icons and descriptions."
+    },
+    {
+      "name": "Profile",
+      "purpose": "User's digital identity on campus.",
+      "states": {
+        "loading": "Skeleton blocks",
+        "empty": "Empty activity log",
+        "error": "Retry loading profile"
+      },
+      "layout": "Cover image with vertical gradient scrim. Large circular avatar intersecting the cover and content. Tag wrap layout for interests. List for recent activities."
+    }
+  ],
+  "images": {
+    "hero_campus": {
+      "url": "https://images.pexels.com/photos/36922859/pexels-photo-36922859.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Sunny campus with palm trees for Auth/Welcome backgrounds"
+    },
+    "group_laughing": {
+      "url": "https://images.pexels.com/photos/7683897/pexels-photo-7683897.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Diverse group of college students laughing outdoors for empty states"
+    },
+    "event_art": {
+      "url": "https://images.pexels.com/photos/36979662/pexels-photo-36979662.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Students engaging in an art workshop for event covers"
+    },
+    "student_avatar_male": {
+      "url": "https://images.unsplash.com/photo-1654110455429-cf322b40a906?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHx5b3VuZyUyMG1vZGVybiUyMGNvbGxlZ2UlMjBzdHVkZW50JTIwYXZhdGFyJTIwcHJvZmlsZSUyMHBob3RvfGVufDB8fHx8MTc4OTk1MDAzOHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Young male student avatar"
+    },
+    "student_avatar_female": {
+      "url": "https://images.pexels.com/photos/31895928/pexels-photo-31895928.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Young female student in graduation gown"
+    },
+    "empty_state_friends": {
+      "url": "https://images.pexels.com/photos/5537982/pexels-photo-5537982.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Young women with backpacks talking for empty states"
+    }
+  },
+  "instructions_to_main_agent": [
+    "NUCLEAR BAN on Blue, Navy, Purple, Indigo, Orange, and Terracotta. Use the provided mint/emerald (brand: #10B981) for all active states, accents, and CTA buttons.",
+    "Use 'Plus Jakarta Sans' for all text (load via expo-font). Weight capped at 500. Let size dictate hierarchy (e.g. 2xl for headings).",
+    "Gradient Scrim Mandatory: Any text rendered on top of an image MUST have an expo-linear-gradient behind it (top: transparent, bottom: 80% surfaceInverse). No exceptions.",
+    "Sticky CTAs: For screens with primary actions (Onboarding 'Continue', Event 'Find People to Go With'), pin the button at the bottom using a fixed container with safe area insets, independent of the scrolling content.",
+    "Implement glassmorphism using expo-blur strictly according to the 'glassmorphism' object in this JSON (e.g., sticky headers and tab bar).",
+    "For the 'Discover' screen grids, use single column for Events (width: 100%), and 2-column flex-wrap grids for People (justifyContent space-between). Avoid left-clustered orphans.",
+    "Empty and Loading states must flex: 1 and center vertically. Use the provided empty state images (group_laughing or empty_state_friends).",
+    "Wire haptics to all major interactions (buttons, tabs, matching) using expo-haptics.",
+    "Use Phosphor icons consistently. Ensure hitSlop or minimum 44x44pt size for all Pressable elements.",
+    "Maintain generous padding (xl: 24px) at screen roots. Do not let cards sit flush against the screen edges.",
+    "Ensure 'brandTertiary' and 'brandPrimary' are used effectively for the interest chip selections in Onboarding."
+  ]
+}
