@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -19,8 +19,18 @@ export default function Create() {
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const submitEvent = async () => {
+    if (!title.trim() || !description.trim() || !date.trim() || !time.trim() || !location.trim()) {
+      setError("Complete the title, description, date, time, and location.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+      setError("Use YYYY-MM-DD for the date.");
+      return;
+    }
+    setError("");
     setSaving(true);
     try {
       const r = await api.createEvent({
@@ -29,11 +39,19 @@ export default function Create() {
         cover_image_url: "https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=900&q=80",
       });
       router.replace(`/event/${r.event.id}`);
-    } catch {}
-    setSaving(false);
+    } catch (e: any) {
+      setError(e?.message || "Could not create the event.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const submitRec = async () => {
+    if (!title.trim() || !description.trim()) {
+      setError("Add a title and description.");
+      return;
+    }
+    setError("");
     setSaving(true);
     try {
       await api.createRecommendation({
@@ -41,8 +59,11 @@ export default function Create() {
         image_url: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=900&q=80",
       });
       router.replace("/(tabs)/discover");
-    } catch {}
-    setSaving(false);
+    } catch (e: any) {
+      setError(e?.message || "Could not create the recommendation.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (mode === "pick") {
@@ -109,6 +130,7 @@ export default function Create() {
           <Text style={styles.label}>Location</Text>
           <TextInput value={location} onChangeText={setLocation} placeholder="Student Rec Center" placeholderTextColor={colors.muted} style={styles.input} testID="create-location" />
         </ScrollView>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.footer}>
           <Button label={mode === "event" ? "Post event" : "Post recommendation"} onPress={mode === "event" ? submitEvent : submitRec} loading={saving} disabled={!title || !description} testID="create-submit" />
         </View>
@@ -146,5 +168,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "600", color: colors.onSurface, marginTop: spacing.md, marginBottom: 6 },
   input: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 14, fontSize: 15, color: colors.onSurface, borderWidth: 1, borderColor: colors.border },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  error: { color: colors.error, fontSize: 13, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   footer: { padding: spacing.xl, borderTopWidth: 1, borderTopColor: colors.divider },
 });
