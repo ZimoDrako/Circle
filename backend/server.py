@@ -13,7 +13,6 @@ import uuid
 import logging
 import bcrypt
 import jwt
-import requests
 import random
 import re
 from zoneinfo import ZoneInfo
@@ -26,12 +25,7 @@ load_dotenv(ROOT_DIR / ".env")
 JWT_SECRET = os.environ["JWT_SECRET"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
-
-STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
-STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
 APP_NAME = "circle-campus"
-_storage_key: Optional[str] = None
 
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
@@ -41,48 +35,6 @@ api = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("circle")
-
-
-# ---------------------------------------------------------------------------
-# Object storage helpers
-# ---------------------------------------------------------------------------
-def _init_storage_sync() -> str:
-    global _storage_key
-    if _storage_key:
-        return _storage_key
-    r = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
-    r.raise_for_status()
-    _storage_key = r.json()["storage_key"]
-    return _storage_key
-
-
-def _put_object_sync(path: str, data: bytes, content_type: str) -> dict:
-    key = _init_storage_sync()
-    r = requests.put(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": key, "Content-Type": content_type},
-        data=data,
-        timeout=120,
-    )
-    if r.status_code == 503:
-        global _storage_key
-        _storage_key = None
-        key = _init_storage_sync()
-        r = requests.put(
-            f"{STORAGE_URL}/objects/{path}",
-            headers={"X-Storage-Key": key, "Content-Type": content_type},
-            data=data,
-            timeout=120,
-        )
-    r.raise_for_status()
-    return r.json()
-
-
-def _get_object_sync(path: str) -> tuple[bytes, str]:
-    key = _init_storage_sync()
-    r = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
-    r.raise_for_status()
-    return r.content, r.headers.get("Content-Type", "application/octet-stream")
 
 
 # ---------------------------------------------------------------------------
@@ -221,14 +173,16 @@ class ReportBody(BaseModel):
 def compatibility(a: dict, b: dict) -> tuple[int, List[str]]:
     reasons: List[str] = []
 
-    a_int = set(a.get("interests") or [])
-    b_int = set(b.get("interests") or [])
+    a_interest_map = {str(x).strip().casefold(): str(x).strip() for x in (a.get("interests") or []) if str(x).strip()}
+    b_interest_map = {str(x).strip().casefold(): str(x).strip() for x in (b.get("interests") or []) if str(x).strip()}
+    a_int = set(a_interest_map)
+    b_int = set(b_interest_map)
     shared = a_int & b_int
     interest_score = 0
     if a_int and b_int:
         interest_score = len(shared) / max(len(a_int | b_int), 1)
     for i in list(shared)[:3]:
-        reasons.append(f"You both like {i}")
+        reasons.append(f"You both like {a_interest_map.get(i, b_interest_map.get(i, i))}")
 
     # social style match: same answer per question
     a_ss = a.get("social_style") or {}
@@ -250,8 +204,8 @@ def compatibility(a: dict, b: dict) -> tuple[int, List[str]]:
         personality_score = 0
 
     # looking for overlap
-    a_lf = set(a.get("looking_for") or [])
-    b_lf = set(b.get("looking_for") or [])
+    a_lf = {str(x).strip().casefold() for x in (a.get("looking_for") or []) if str(x).strip()}
+    b_lf = {str(x).strip().casefold() for x in (b.get("looking_for") or []) if str(x).strip()}
     lf_shared = a_lf & b_lf
     lf_score = (len(lf_shared) / max(len(a_lf | b_lf), 1)) if (a_lf and b_lf) else 0
     if lf_shared:
@@ -401,7 +355,9 @@ async def get_matches(user: dict = Depends(current_user), limit: int = 30):
     scored = []
     for o in others:
         score, reasons = compatibility(user, o)
-        shared = list(set(user.get("interests") or []) & set(o.get("interests") or []))
+        user_interests = {str(x).strip().casefold(): str(x).strip() for x in (user.get("interests") or []) if str(x).strip()}
+        other_interests = {str(x).strip().casefold(): str(x).strip() for x in (o.get("interests") or []) if str(x).strip()}
+        shared = [user_interests.get(k, other_interests[k]) for k in (set(user_interests) & set(other_interests))]
         scored.append(
             {
                 "user": public_user(o),
@@ -421,7 +377,9 @@ async def get_user(user_id: str, user: dict = Depends(current_user)):
     if not u:
         raise HTTPException(404, "Not found")
     score, reasons = compatibility(user, u)
-    shared = list(set(user.get("interests") or []) & set(u.get("interests") or []))
+    user_interests = {str(x).strip().casefold(): str(x).strip() for x in (user.get("interests") or []) if str(x).strip()}
+    other_interests = {str(x).strip().casefold(): str(x).strip() for x in (u.get("interests") or []) if str(x).strip()}
+    shared = [user_interests.get(k, other_interests[k]) for k in (set(user_interests) & set(other_interests))]
     return {
         "user": public_user(u),
         "compatibility": score,
@@ -2078,8 +2036,3 @@ async def on_start():
         logger.info("Seed check complete")
     except Exception as e:
         logger.error(f"Seed failed: {e}")
-
-@app.on_event("shutdown")
-async def on_stop():
-    if client:
-        client.close()
