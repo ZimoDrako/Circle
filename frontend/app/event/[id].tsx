@@ -58,8 +58,7 @@ export default function EventDetail() {
           <Image source={{ uri: event.cover_image_url }} style={styles.hero} contentFit="cover" />
           <LinearGradient colors={["rgba(0,0,0,0.4)", "transparent", "rgba(9,9,11,0.9)"]} style={StyleSheet.absoluteFill} />
           <SafeAreaView edges={["top"]} style={styles.heroTop}>
-            <Pressable onPress={() => router.back()} style={styles.back} testID="event-back">
-              <Icon name="chevron-back" size={22} color="#FFF" />
+<Pressable onPress={() => router.replace('/(tabs)/home')} style={styles.back} testID="event-back">              <Icon name="chevron-back" size={22} color="#FFF" />
             </Pressable>
           </SafeAreaView>
           <View style={styles.heroBody}>
@@ -175,7 +174,7 @@ export default function EventDetail() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   heroWrap: { height: 320, backgroundColor: colors.surfaceTertiary },
-  hero: { ...StyleSheet.absoluteFillObject },
+  hero: { ...StyleSheet.absoluteFill },
   heroTop: { paddingHorizontal: spacing.lg },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center", marginTop: spacing.sm },
   heroBody: { position: "absolute", left: spacing.xl, right: spacing.xl, bottom: spacing.xl },

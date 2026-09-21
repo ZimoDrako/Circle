@@ -1,11 +1,13 @@
-"""Seed demo data for CIRCLE MVP.
+"""Seed demo data for CIRCLE MVP using Supabase.
 
-All records include `_demo: True` so they can be identified and later removed.
-Idempotent: only seeds when the users collection is empty of demo users.
+All records use demo=True so they can be identified and later removed.
+Idempotent: only seeds when demo users do not already exist.
 """
+
 from datetime import datetime, timezone, timedelta
 import uuid
 import random
+
 
 DEMO_UNI = "California State University, Fullerton"
 
@@ -28,8 +30,14 @@ MAJORS = [
     "Communications", "Art", "Engineering", "Kinesiology", "Nursing",
     "Political Science", "Economics", "Mathematics",
 ]
+
 YEARS = ["Freshman", "Sophomore", "Junior", "Senior", "Grad"]
-DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+DAYS = [
+    "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday", "Sunday"
+]
+
 TIMES = ["Morning", "Afternoon", "Evening", "Late night"]
 
 FIRST_NAMES = [
@@ -38,6 +46,7 @@ FIRST_NAMES = [
     "Olivia", "Liam", "Isabella", "Noah", "Mia", "Lucas", "Ava", "Mason",
     "Charlotte", "Aiden", "Amelia", "Kai", "Zoe", "Diego",
 ]
+
 LAST_NAMES = [
     "Nguyen", "Garcia", "Rodriguez", "Kim", "Patel", "Lee", "Martinez",
     "Chen", "Singh", "Nakamura", "Cruz", "Rivera", "Anderson", "Brown",
@@ -108,7 +117,12 @@ RECS = [
     ("Sunday flea market", "OC Marketplace at the Fairgrounds — vintage clothes + food.", "Explore", "OC Fairgrounds", ["Fashion", "Food"]),
 ]
 
-SOCIAL_STYLE_QUESTIONS = ["arrival", "friday_night", "spontaneous", "group_size"]
+SOCIAL_STYLE_QUESTIONS = [
+    "arrival",
+    "friday_night",
+    "spontaneous",
+    "group_size",
+]
 
 EVENTS = [
     ("Titan Gaming Night", "Casual Smash + Valorant tournament. Snacks provided.", "Gaming", ["Gaming"], "Student Union Room 210", 1),
@@ -133,10 +147,33 @@ def _pick(lst, n):
     return random.sample(lst, min(n, len(lst)))
 
 
-async def seed_all(db, hash_password):
+def _insert(supabase, table, record):
+    """Insert one record into a Supabase table."""
+    supabase.table(table).insert(record).execute()
+
+
+def _select_one(supabase, table, **filters):
+    """Return one matching Supabase record or None."""
+    query = supabase.table(table).select("*")
+
+    for key, value in filters.items():
+        query = query.eq(key, value)
+
+    result = query.limit(1).execute()
+    return result.data[0] if result.data else None
+
+
+async def seed_all(supabase, hash_password):
     # Idempotent check
-    demo_count = await db.users.count_documents({"_demo": True})
-    if demo_count > 0:
+    result = (
+        supabase.table("users")
+        .select("id", count="exact")
+        .eq("demo", True)
+        .limit(1)
+        .execute()
+    )
+
+    if (result.count or 0) > 0:
         return
 
     random.seed(42)
@@ -148,9 +185,19 @@ async def seed_all(db, hash_password):
         first = FIRST_NAMES[i % len(FIRST_NAMES)]
         last = LAST_NAMES[i % len(LAST_NAMES)]
         uid = str(uuid.uuid4())
+
         user_ids.append(uid)
-        interests = _pick(INTERESTS_POOL, random.randint(4, 8))
-        social = {q: random.randint(0, 4) for q in SOCIAL_STYLE_QUESTIONS}
+
+        interests = _pick(
+            INTERESTS_POOL,
+            random.randint(4, 8),
+        )
+
+        social = {
+            q: random.randint(0, 4)
+            for q in SOCIAL_STYLE_QUESTIONS
+        }
+
         personality = {
             "extroversion": random.randint(20, 90),
             "spontaneity": random.randint(20, 90),
@@ -159,8 +206,9 @@ async def seed_all(db, hash_password):
             "competitive": random.randint(20, 90),
             "adventurous": random.randint(20, 90),
         }
+
         doc = {
-            "_demo": True,
+            "demo": True,
             "id": uid,
             "email": f"demo{i}@circle.demo",
             "password_hash": hash_password("demo1234"),
@@ -171,121 +219,246 @@ async def seed_all(db, hash_password):
             "verified": random.random() < 0.7,
             "onboarded": True,
             "interests": interests,
-            "looking_for": _pick(LOOKING_FOR_POOL, random.randint(2, 4)),
+            "looking_for": _pick(
+                LOOKING_FOR_POOL,
+                random.randint(2, 4),
+            ),
             "social_style": social,
             "personality": personality,
             "year": random.choice(YEARS),
             "major": random.choice(MAJORS),
             "lives_on_campus": random.random() < 0.4,
-            "availability_days": _pick(DAYS, random.randint(3, 6)),
-            "availability_times": _pick(TIMES, random.randint(2, 3)),
-            "profile_photo_url": AVATAR_URLS[i % len(AVATAR_URLS)],
+            "availability_days": _pick(
+                DAYS,
+                random.randint(3, 6),
+            ),
+            "availability_times": _pick(
+                TIMES,
+                random.randint(2, 3),
+            ),
+            "profile_photo_url": AVATAR_URLS[
+                i % len(AVATAR_URLS)
+            ],
             "bio": random.choice([
                 f"{random.choice(YEARS)} studying {random.choice(MAJORS).lower()}. Down to try new things.",
-                f"Coffee addict. Looking for people to explore OC with.",
-                f"Gym in the morning, gaming at night. Let's link.",
-                f"Trying to meet more people this semester.",
-                f"Love good food and long convos.",
+                "Coffee addict. Looking for people to explore OC with.",
+                "Gym in the morning, gaming at night. Let's link.",
+                "Trying to meet more people this semester.",
+                "Love good food and long convos.",
             ]),
             "created_at": now.isoformat(),
         }
-        await db.users.insert_one(doc)
+
+        _insert(supabase, "users", doc)
 
     # 8 clubs
-    club_ids = []
     for idx, (name, desc, cat, tags) in enumerate(CLUBS):
         cid = str(uuid.uuid4())
-        club_ids.append(cid)
-        await db.clubs.insert_one({
-            "_demo": True,
-            "id": cid,
-            "university": DEMO_UNI,
-            "name": name,
-            "description": desc,
-            "category": cat,
-            "tags": tags,
-            "image_url": CLUB_IMAGES[idx % len(CLUB_IMAGES)],
-            "member_ids": _pick(user_ids, random.randint(8, 20)),
-            "created_at": now.isoformat(),
-        })
 
-    # 15 events over next 2 weeks
-    event_ids = []
-    for idx, (title, desc, cat, tags, loc, days_ahead) in enumerate(EVENTS):
+        _insert(
+            supabase,
+            "clubs",
+            {
+                "demo": True,
+                "id": cid,
+                "university": DEMO_UNI,
+                "name": name,
+                "description": desc,
+                "category": cat,
+                "tags": tags,
+                "image_url": CLUB_IMAGES[
+                    idx % len(CLUB_IMAGES)
+                ],
+                "member_ids": _pick(
+                    user_ids,
+                    random.randint(8, 20),
+                ),
+                "created_at": now.isoformat(),
+            },
+        )
+
+    # 15 events over the next 2 weeks
+    for idx, (
+        title,
+        desc,
+        cat,
+        tags,
+        loc,
+        days_ahead,
+    ) in enumerate(EVENTS):
+
         eid = str(uuid.uuid4())
-        event_ids.append(eid)
-        date = (now + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
-        time = random.choice(["6:00 PM", "7:00 PM", "8:00 PM", "5:30 PM", "11:00 AM", "2:00 PM", "9:00 PM"])
+        date = (
+            now + timedelta(days=days_ahead)
+        ).strftime("%Y-%m-%d")
+
+        time = random.choice([
+            "6:00 PM",
+            "7:00 PM",
+            "8:00 PM",
+            "5:30 PM",
+            "11:00 AM",
+            "2:00 PM",
+            "9:00 PM",
+        ])
+
         creator = random.choice(user_ids)
-        creator_user = await db.users.find_one({"id": creator}, {"first_name": 1, "last_name": 1})
-        await db.events.insert_one({
-            "_demo": True,
-            "id": eid,
-            "creator_id": creator,
-            "creator_name": f"{creator_user['first_name']} {creator_user['last_name']}" if creator_user else "Student",
-            "title": title,
-            "description": desc,
-            "date": date,
-            "time": time,
-            "location": loc,
-            "category": cat,
-            "tags": tags,
-            "capacity": random.choice([None, 20, 30, 50]),
-            "cover_image_url": EVENT_IMAGES[idx % len(EVENT_IMAGES)],
-            "event_type": random.choice(["student", "official", "hangout"]),
-            "created_at": now.isoformat(),
-        })
-        # random attendees
-        attendees = _pick(user_ids, random.randint(6, 22))
-        for a in attendees:
-            await db.event_attendees.insert_one({
-                "_demo": True,
-                "event_id": eid,
-                "user_id": a,
-                "status": random.choice(["going", "going", "interested"]),
-                "updated_at": now.isoformat(),
-            })
+
+        creator_user = _select_one(
+            supabase,
+            "users",
+            id=creator,
+        )
+
+        _insert(
+            supabase,
+            "events",
+            {
+                "demo": True,
+                "id": eid,
+                "creator_id": creator,
+                "creator_name": (
+                    f"{creator_user['first_name']} "
+                    f"{creator_user['last_name']}"
+                    if creator_user
+                    else "Student"
+                ),
+                "title": title,
+                "description": desc,
+                "date": date,
+                "time": time,
+                "location": loc,
+                "category": cat,
+                "tags": tags,
+                "capacity": random.choice([
+                    None,
+                    20,
+                    30,
+                    50,
+                ]),
+                "cover_image_url": EVENT_IMAGES[
+                    idx % len(EVENT_IMAGES)
+                ],
+                "event_type": random.choice([
+                    "student",
+                    "official",
+                    "hangout",
+                ]),
+                "created_at": now.isoformat(),
+            },
+        )
+
+        attendees = _pick(
+            user_ids,
+            random.randint(6, 22),
+        )
+
+        for attendee in attendees:
+            _insert(
+                supabase,
+                "event_attendees",
+                {
+                    "event_id": eid,
+                    "user_id": attendee,
+                    "status": random.choice([
+                        "going",
+                        "going",
+                        "interested",
+                    ]),
+                    "updated_at": now.isoformat(),
+                },
+            )
 
     # 5 recommendations
-    for idx, (title, desc, cat, loc, tags) in enumerate(RECS):
+    for idx, (
+        title,
+        desc,
+        cat,
+        loc,
+        tags,
+    ) in enumerate(RECS):
+
         creator = random.choice(user_ids)
-        cu = await db.users.find_one({"id": creator}, {"first_name": 1, "last_name": 1, "profile_photo_url": 1})
-        await db.recommendations.insert_one({
-            "_demo": True,
-            "id": str(uuid.uuid4()),
-            "creator_id": creator,
-            "creator_name": f"{cu['first_name']} {cu['last_name']}" if cu else "Student",
-            "creator_photo": cu.get("profile_photo_url") if cu else None,
-            "title": title,
-            "description": desc,
-            "category": cat,
-            "location": loc,
-            "tags": tags,
-            "image_url": EVENT_IMAGES[(idx + 5) % len(EVENT_IMAGES)],
-            "saves": random.randint(5, 40),
-            "created_at": now.isoformat(),
-        })
+
+        creator_user = _select_one(
+            supabase,
+            "users",
+            id=creator,
+        )
+
+        _insert(
+            supabase,
+            "recommendations",
+            {
+                "demo": True,
+                "id": str(uuid.uuid4()),
+                "creator_id": creator,
+                "creator_name": (
+                    f"{creator_user['first_name']} "
+                    f"{creator_user['last_name']}"
+                    if creator_user
+                    else "Student"
+                ),
+                "creator_photo": (
+                    creator_user.get("profile_photo_url")
+                    if creator_user
+                    else None
+                ),
+                "title": title,
+                "description": desc,
+                "category": cat,
+                "location": loc,
+                "tags": tags,
+                "image_url": EVENT_IMAGES[
+                    (idx + 5) % len(EVENT_IMAGES)
+                ],
+                "saves": random.randint(5, 40),
+                "created_at": now.isoformat(),
+            },
+        )
 
     # 3 Circles with chat
-    CIRCLE_SPECS = [
-        ("Night Owls", ["Gaming", "Food", "Music", "Nightlife"]),
-        ("Coffee & Coding", ["Coding", "Coffee", "AI", "Books"]),
-        ("Titan Ballers", ["Basketball", "Fitness", "Sports"]),
+    circle_specs = [
+        (
+            "Night Owls",
+            ["Gaming", "Food", "Music", "Nightlife"],
+        ),
+        (
+            "Coffee & Coding",
+            ["Coding", "Coffee", "AI", "Books"],
+        ),
+        (
+            "Titan Ballers",
+            ["Basketball", "Fitness", "Sports"],
+        ),
     ]
-    for name, interests in CIRCLE_SPECS:
-        members = _pick(user_ids, random.randint(5, 8))
+
+    for name, interests in circle_specs:
+        members = _pick(
+            user_ids,
+            random.randint(5, 8),
+        )
+
         cid = str(uuid.uuid4())
-        await db.circles.insert_one({
-            "_demo": True,
-            "id": cid,
-            "name": name,
-            "creator_id": members[0],
-            "member_ids": members,
-            "interests": interests,
-            "event_id": None,
-            "created_at": now.isoformat(),
-        })
-        # seed some messages
+
+        _insert(
+            supabase,
+            "circles",
+            {
+                "demo": True,
+                "id": cid,
+                "type": "group",
+                "name": name,
+                "creator_id": members[0],
+                "member_ids": members,
+                "interests": interests,
+                "event_id": None,
+                "verified_only": False,
+                "is_lounge": False,
+                "created_at": now.isoformat(),
+            },
+        )
+
         sample_msgs = [
             "yo who's down for tonight",
             "im in, what time?",
@@ -293,56 +466,121 @@ async def seed_all(db, hash_password):
             "bring snacks",
             "on my way",
         ]
+
         for i, txt in enumerate(sample_msgs):
             sender = random.choice(members)
-            await db.messages.insert_one({
-                "_demo": True,
+
+            _insert(
+                supabase,
+                "messages",
+                {
+                    "id": str(uuid.uuid4()),
+                    "circle_id": cid,
+                    "sender_id": sender,
+                    "content": txt,
+                    "system": False,
+                    "created_at": (
+                        now - timedelta(hours=5 - i)
+                    ).isoformat(),
+                },
+            )
+
+
+async def seed_lounge(supabase):
+    """Create the private Verified Lounge if it does not exist."""
+
+    existing = _select_one(
+        supabase,
+        "circles",
+        is_lounge=True,
+    )
+
+    if existing:
+        return
+
+    now = datetime.now(timezone.utc)
+
+    result = (
+        supabase.table("users")
+        .select("id,first_name")
+        .eq("demo", True)
+        .eq("verified", True)
+        .limit(50)
+        .execute()
+    )
+
+    verified = result.data or []
+    members = [
+        user["id"]
+        for user in verified[:10]
+    ]
+
+    cid = str(uuid.uuid4())
+
+    _insert(
+        supabase,
+        "circles",
+        {
+            "demo": True,
+            "id": cid,
+            "type": "group",
+            "name": "Verified Lounge",
+            "description": "A private space for CSUF Verified Titans only.",
+            "creator_id": (
+                members[0]
+                if members
+                else "system"
+            ),
+            "member_ids": members,
+            "interests": [
+                "Campus Life",
+                "Titans",
+                "Verified",
+            ],
+            "event_id": None,
+            "verified_only": True,
+            "is_lounge": True,
+            "created_at": now.isoformat(),
+        },
+    )
+
+    msgs = [
+        (
+            None,
+            "Welcome to the Verified Lounge — real Titans only ✓",
+        ),
+        (
+            0,
+            "finally a chat without randoms lol",
+        ),
+        (
+            1,
+            "anyone know if the library is open late this week?",
+        ),
+        (
+            2,
+            "yep till midnight during midterms",
+        ),
+    ]
+
+    for i, (idx, txt) in enumerate(msgs):
+        sender = (
+            "system"
+            if idx is None or idx >= len(members)
+            else members[idx]
+        )
+
+        _insert(
+            supabase,
+            "messages",
+            {
                 "id": str(uuid.uuid4()),
                 "circle_id": cid,
                 "sender_id": sender,
                 "content": txt,
-                "system": False,
-                "created_at": (now - timedelta(hours=5 - i)).isoformat(),
-            })
-
-
-
-async def seed_lounge(db):
-    """Private Verified Lounge — only visible to CSUF Verified students. Idempotent."""
-    if await db.circles.find_one({"is_lounge": True}):
-        return
-    now = datetime.now(timezone.utc)
-    verified = await db.users.find({"_demo": True, "verified": True}, {"id": 1, "first_name": 1}).to_list(50)
-    members = [u["id"] for u in verified[:10]]
-    cid = str(uuid.uuid4())
-    await db.circles.insert_one({
-        "_demo": True,
-        "id": cid,
-        "type": "group",
-        "name": "Verified Lounge",
-        "description": "A private space for CSUF Verified Titans only.",
-        "creator_id": members[0] if members else "system",
-        "member_ids": members,
-        "interests": ["Campus Life", "Titans", "Verified"],
-        "event_id": None,
-        "verified_only": True,
-        "is_lounge": True,
-        "created_at": now.isoformat(),
-    })
-    msgs = [
-        (None, "Welcome to the Verified Lounge — real Titans only ✓"),
-        (0, "finally a chat without randoms lol"),
-        (1, "anyone know if the library is open late this week?"),
-        (2, "yep till midnight during midterms"),
-    ]
-    for i, (idx, txt) in enumerate(msgs):
-        sender = "system" if idx is None or idx >= len(members) else members[idx]
-        await db.messages.insert_one({
-            "_demo": True,
-            "id": str(uuid.uuid4()),
-            "circle_id": cid,
-            "sender_id": sender,
-            "content": txt,
-            "system": sender == "system",
-            "created_at": (now - timedelta(hours=4 - i)).isoformat(),
-        })
+                "system": sender == "system",
+                "created_at": (
+                    now - timedelta(hours=4 - i)
+                ).isoformat(),
+            },
+        )

@@ -1,8 +1,7 @@
 // API client for CIRCLE.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "";
-
+const BASE = "https://super-duper-funicular-pwgrrvr697r36g75-8000.app.github.dev";
 let cachedToken: string | null = null;
 
 export async function setToken(token: string | null) {

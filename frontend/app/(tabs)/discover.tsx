@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 10, borderWidth: 1, borderColor: colors.border,
   },
   eventCard: { height: 170, borderRadius: radius.lg, overflow: "hidden", backgroundColor: colors.surfaceSecondary },
-  eventImg: { ...StyleSheet.absoluteFillObject },
+  eventImg: { ...StyleSheet.absoluteFill },
   eventBody: { position: "absolute", left: spacing.lg, right: spacing.lg, bottom: spacing.lg },
   eventCat: { color: colors.brandSecondary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
   eventTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 },

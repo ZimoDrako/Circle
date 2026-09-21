@@ -4,7 +4,6 @@ from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Any
 from datetime import datetime, timezone, timedelta
@@ -18,14 +17,15 @@ import requests
 import random
 import re
 from zoneinfo import ZoneInfo
+from supabase import create_client, Client
 
 ROOT_DIR = Path(__file__).parent
 CAMPUS_TZ = ZoneInfo("America/Los_Angeles")
 load_dotenv(ROOT_DIR / ".env")
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -33,8 +33,8 @@ STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
 APP_NAME = "circle-campus"
 _storage_key: Optional[str] = None
 
-client = AsyncIOMotorClient(MONGO_URL)
-db = client[DB_NAME]
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 app = FastAPI(title="CIRCLE API")
 api = APIRouter(prefix="/api")
@@ -127,7 +127,8 @@ async def current_user(authorization: Optional[str] = Header(None)) -> dict:
         user_id = payload["sub"]
     except Exception:
         raise HTTPException(401, "Invalid token")
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    result = supabase.table("users").select("*").eq("id", user_id).limit(1).execute()
+    user = result.data[0] if result.data else None
     if not user:
         raise HTTPException(401, "User not found")
     return user
@@ -317,7 +318,8 @@ def public_user(u: dict) -> dict:
 # ---------------------------------------------------------------------------
 @api.post("/auth/signup")
 async def signup(body: SignUpBody, _: None = Depends(rate_limit_auth)):
-    existing = await db.users.find_one({"email": body.email.lower()})
+    result = supabase.table("users").select("*").eq("email", body.email.lower()).limit(1).execute()
+    existing = result.data[0] if result.data else None
     if existing:
         raise HTTPException(400, "Email already registered")
     user_id = str(uuid.uuid4())
@@ -339,13 +341,14 @@ async def signup(body: SignUpBody, _: None = Depends(rate_limit_auth)):
         "availability_times": [],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.users.insert_one(doc)
+    supabase.table("users").insert(doc).execute()
     return {"token": make_token(user_id), "user": public_user(doc)}
 
 
 @api.post("/auth/login")
 async def login(body: LoginBody, _: None = Depends(rate_limit_auth)):
-    u = await db.users.find_one({"email": body.email.lower()})
+    result = supabase.table("users").select("*").eq("email", body.email.lower()).limit(1).execute()
+    u = result.data[0] if result.data else None
     if not u or not verify_password(body.password, u.get("password_hash", "")):
         raise HTTPException(401, "Invalid credentials")
     return {"token": make_token(u["id"]), "user": public_user(u)}
@@ -359,8 +362,9 @@ async def me(user: dict = Depends(current_user)):
 @api.post("/auth/verify-student")
 async def verify_student(user: dict = Depends(current_user)):
     # Simulated verification
-    await db.users.update_one({"id": user["id"]}, {"$set": {"verified": True}})
-    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    supabase.table("users").update({"verified": True}).eq("id", user["id"]).execute()
+    result = supabase.table("users").select("*").eq("id", user["id"]).limit(1).execute()
+    u = result.data[0] if result.data else None
     return {"user": public_user(u)}
 
 
@@ -371,8 +375,9 @@ async def verify_student(user: dict = Depends(current_user)):
 async def save_onboarding(body: OnboardingBody, user: dict = Depends(current_user)):
     update = {k: v for k, v in body.model_dump().items() if v is not None}
     update["onboarded"] = True
-    await db.users.update_one({"id": user["id"]}, {"$set": update})
-    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    supabase.table("users").update(update).eq("id", user["id"]).execute()
+    result = supabase.table("users").select("*").eq("id", user["id"]).limit(1).execute()
+    u = result.data[0] if result.data else None
     return {"user": public_user(u)}
 
 
@@ -381,9 +386,18 @@ async def save_onboarding(body: OnboardingBody, user: dict = Depends(current_use
 # ---------------------------------------------------------------------------
 @api.get("/matches")
 async def get_matches(user: dict = Depends(current_user), limit: int = 30):
-    others = await db.users.find(
-        {"id": {"$ne": user["id"]}, "onboarded": True}, {"_id": 0, "password_hash": 0}
-    ).to_list(500)
+    result = (
+        supabase.table("users")
+        .select("*")
+        .neq("id", user["id"])
+        .eq("onboarded", True)
+        .limit(500)
+        .execute()
+    )
+    others = [
+        o for o in result.data
+        if o.get("id") != user["id"]
+    ]
     scored = []
     for o in others:
         score, reasons = compatibility(user, o)
@@ -402,7 +416,8 @@ async def get_matches(user: dict = Depends(current_user), limit: int = 30):
 
 @api.get("/users/{user_id}")
 async def get_user(user_id: str, user: dict = Depends(current_user)):
-    u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    result = supabase.table("users").select("*").eq("id", user_id).limit(1).execute()
+    u = result.data[0] if result.data else None
     if not u:
         raise HTTPException(404, "Not found")
     score, reasons = compatibility(user, u)
@@ -418,14 +433,14 @@ async def get_user(user_id: str, user: dict = Depends(current_user)):
 
 @api.get("/users")
 async def list_users(user: dict = Depends(current_user), q: Optional[str] = Query(None, max_length=80)):
-    query: dict = {"id": {"$ne": user["id"]}, "onboarded": True}
+    query = supabase.table("users").select("*").neq("id", user["id"]).eq("onboarded", True)
     if q:
-        query["$or"] = [
-            {"first_name": {"$regex": re.escape(q), "$options": "i"}},
-            {"last_name": {"$regex": re.escape(q), "$options": "i"}},
-            {"major": {"$regex": re.escape(q), "$options": "i"}},
-        ]
-    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).to_list(200)
+        search = re.escape(q)
+        query = query.or_(
+            f"first_name.ilike.*{search}*,last_name.ilike.*{search}*,major.ilike.*{search}*"
+        )
+    result = query.limit(200).execute()
+    users = result.data
     return {"users": [public_user(u) for u in users]}
 
 
@@ -441,8 +456,7 @@ async def create_event(body: EventCreateBody, user: dict = Depends(current_user)
         **body.model_dump(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.events.insert_one(ev)
-    ev.pop("_id", None)
+    supabase.table("events").insert(ev).execute()
     return {"event": ev}
 
 
@@ -452,89 +466,185 @@ async def list_events(
     category: Optional[str] = None,
     q: Optional[str] = Query(None, max_length=80),
 ):
-    query: dict = {}
+    query = supabase.table("events").select("*")
+
     if category:
-        query["category"] = category
+        query = query.eq("category", category)
+
+    result = query.limit(200).execute()
+    events = result.data or []
+
     if q:
-        query["$or"] = [
-            {"title": {"$regex": re.escape(q), "$options": "i"}},
-            {"description": {"$regex": re.escape(q), "$options": "i"}},
-            {"tags": {"$regex": re.escape(q), "$options": "i"}},
+        search = q.lower()
+        events = [
+            e for e in events
+            if search in (e.get("title") or "").lower()
+            or search in (e.get("description") or "").lower()
+            or any(search in str(tag).lower() for tag in (e.get("tags") or []))
         ]
-    events = await db.events.find(query, {"_id": 0}).sort("date", 1).to_list(200)
-    # attach counts
+
+    events.sort(key=lambda x: x.get("date") or "")
+
     for e in events:
-        e["interested_count"] = await db.event_attendees.count_documents(
-            {"event_id": e["id"], "status": {"$in": ["interested", "going"]}}
+        interested_result = (
+            supabase.table("event_attendees")
+            .select("user_id", count="exact")
+            .eq("event_id", e["id"])
+            .in_("status", ["interested", "going"])
+            .execute()
         )
-        e["going_count"] = await db.event_attendees.count_documents(
-            {"event_id": e["id"], "status": "going"}
+        going_result = (
+            supabase.table("event_attendees")
+            .select("user_id", count="exact")
+            .eq("event_id", e["id"])
+            .eq("status", "going")
+            .execute()
         )
+
+        e["interested_count"] = interested_result.count or 0
+        e["going_count"] = going_result.count or 0
+
         if user:
-            att = await db.event_attendees.find_one(
-                {"event_id": e["id"], "user_id": user["id"]}, {"_id": 0}
+            att_result = (
+                supabase.table("event_attendees")
+                .select("*")
+                .eq("event_id", e["id"])
+                .eq("user_id", user["id"])
+                .limit(1)
+                .execute()
             )
+            att = att_result.data[0] if att_result.data else None
             e["my_status"] = att["status"] if att else None
+
     return {"events": events}
 
 
 @api.get("/events/{event_id}")
 async def get_event(event_id: str, user: Optional[dict] = Depends(optional_user)):
-    e = await db.events.find_one({"id": event_id}, {"_id": 0})
+    result = (
+        supabase.table("events")
+        .select("*")
+        .eq("id", event_id)
+        .limit(1)
+        .execute()
+    )
+    e = result.data[0] if result.data else None
+
     if not e:
         raise HTTPException(404, "Not found")
-    e["interested_count"] = await db.event_attendees.count_documents(
-        {"event_id": event_id, "status": {"$in": ["interested", "going"]}}
+
+    interested_result = (
+        supabase.table("event_attendees")
+        .select("user_id", count="exact")
+        .eq("event_id", event_id)
+        .in_("status", ["interested", "going"])
+        .execute()
     )
-    e["going_count"] = await db.event_attendees.count_documents(
-        {"event_id": event_id, "status": "going"}
+    going_result = (
+        supabase.table("event_attendees")
+        .select("user_id", count="exact")
+        .eq("event_id", event_id)
+        .eq("status", "going")
+        .execute()
     )
+
+    e["interested_count"] = interested_result.count or 0
+    e["going_count"] = going_result.count or 0
+
     if user:
-        att = await db.event_attendees.find_one(
-            {"event_id": event_id, "user_id": user["id"]}, {"_id": 0}
+        att_result = (
+            supabase.table("event_attendees")
+            .select("*")
+            .eq("event_id", event_id)
+            .eq("user_id", user["id"])
+            .limit(1)
+            .execute()
         )
+        att = att_result.data[0] if att_result.data else None
         e["my_status"] = att["status"] if att else None
+
     return {"event": e}
 
 
 @api.post("/events/{event_id}/rsvp")
-async def rsvp_event(event_id: str, status: str = Query(...), user: dict = Depends(current_user)):
+async def rsvp_event(
+    event_id: str,
+    status: str = Query(...),
+    user: dict = Depends(current_user),
+):
     if status not in ("interested", "going", "none"):
         raise HTTPException(400, "Invalid status")
-    e = await db.events.find_one({"id": event_id})
-    if not e:
+
+    event_result = (
+        supabase.table("events")
+        .select("id")
+        .eq("id", event_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not event_result.data:
         raise HTTPException(404, "Event not found")
+
     if status == "none":
-        await db.event_attendees.delete_one({"event_id": event_id, "user_id": user["id"]})
+        supabase.table("event_attendees").delete().eq(
+            "event_id", event_id
+        ).eq(
+            "user_id", user["id"]
+        ).execute()
     else:
-        await db.event_attendees.update_one(
-            {"event_id": event_id, "user_id": user["id"]},
+        supabase.table("event_attendees").upsert(
             {
-                "$set": {
-                    "event_id": event_id,
-                    "user_id": user["id"],
-                    "status": status,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
+                "event_id": event_id,
+                "user_id": user["id"],
+                "status": status,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             },
-            upsert=True,
-        )
+            on_conflict="event_id,user_id",
+        ).execute()
+
     return {"ok": True, "status": status}
 
 
 @api.get("/events/{event_id}/attendees")
 async def event_attendees(event_id: str, user: dict = Depends(current_user)):
-    atts = await db.event_attendees.find({"event_id": event_id}, {"_id": 0}).to_list(500)
+    att_result = (
+        supabase.table("event_attendees")
+        .select("*")
+        .eq("event_id", event_id)
+        .limit(500)
+        .execute()
+    )
+    atts = att_result.data or []
+
     user_ids = [a["user_id"] for a in atts]
-    users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)
+
+    if not user_ids:
+        return {"attendees": []}
+
+    users_result = (
+        supabase.table("users")
+        .select("*")
+        .in_("id", user_ids)
+        .limit(500)
+        .execute()
+    )
+    users = users_result.data or []
+
     umap = {u["id"]: u for u in users}
     result = []
+
     for a in atts:
         u = umap.get(a["user_id"])
         if not u:
             continue
+
         score, reasons = compatibility(user, u)
-        shared = list(set(user.get("interests") or []) & set(u.get("interests") or []))
+        shared = list(
+            set(user.get("interests") or [])
+            & set(u.get("interests") or [])
+        )
+
         result.append(
             {
                 "user": public_user(u),
@@ -544,6 +654,7 @@ async def event_attendees(event_id: str, user: dict = Depends(current_user)):
                 "shared_interests": shared[:5],
             }
         )
+
     result.sort(key=lambda x: x["compatibility"], reverse=True)
     return {"attendees": result}
 
@@ -563,32 +674,63 @@ def _dm_system_msg(circle_id: str, content: str) -> dict:
 
 
 async def decorate_circle(c: dict, user: dict) -> dict:
-    members = await db.users.find(
-        {"id": {"$in": c["member_ids"]}}, {"_id": 0, "password_hash": 0}
-    ).to_list(50)
+    member_ids = c.get("member_ids") or []
+
+    if member_ids:
+        result = (
+            supabase.table("users")
+            .select("*")
+            .in_("id", member_ids)
+            .limit(50)
+            .execute()
+        )
+        members = result.data or []
+    else:
+        members = []
+
     c["members"] = [public_user(m) for m in members]
-    c["is_member"] = user["id"] in c["member_ids"]
+    c["is_member"] = user["id"] in member_ids
     c["verified_only"] = bool(c.get("verified_only"))
     c["is_lounge"] = bool(c.get("is_lounge"))
     c["type"] = c.get("type") or "group"
+
     user_int = set(user.get("interests") or [])
-    c["shared_with_you"] = list(user_int & set(c.get("interests") or []))
+    c["shared_with_you"] = list(
+        user_int & set(c.get("interests") or [])
+    )
+
     if c["type"] == "dm":
-        other = next((m for m in c["members"] if m["id"] != user["id"]), None)
+        other = next(
+            (m for m in c["members"] if m["id"] != user["id"]),
+            None,
+        )
         c["other_user"] = other
-        c["name"] = f"{other['first_name']} {other['last_name']}" if other else "Direct message"
+        c["name"] = (
+            f"{other['first_name']} {other['last_name']}"
+            if other
+            else "Direct message"
+        )
+
     return c
 
 
-def _circle_visibility(user: dict) -> dict:
-    return {} if user.get("verified") else {"verified_only": {"$ne": True}}
+def _circle_visibility(user: dict) -> bool:
+    return bool(user.get("verified"))
 
 
 @api.post("/circles")
-async def create_circle(body: CircleCreateBody, user: dict = Depends(current_user)):
+async def create_circle(
+    body: CircleCreateBody,
+    user: dict = Depends(current_user),
+):
     if body.verified_only and not user.get("verified"):
-        raise HTTPException(403, "Only CSUF Verified students can create verified-only Circles")
+        raise HTTPException(
+            403,
+            "Only CSUF Verified students can create verified-only Circles",
+        )
+
     members = list({user["id"], *body.member_ids})
+
     c = {
         "id": str(uuid.uuid4()),
         "type": "group",
@@ -600,115 +742,339 @@ async def create_circle(body: CircleCreateBody, user: dict = Depends(current_use
         "verified_only": body.verified_only,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.circles.insert_one(c)
-    await db.messages.insert_one(_dm_system_msg(c["id"], f"{user['first_name']} created this Circle"))
-    c.pop("_id", None)
+
+    supabase.table("circles").insert(c).execute()
+
+    msg = _dm_system_msg(
+        c["id"],
+        f"{user['first_name']} created this Circle",
+    )
+    supabase.table("messages").insert(msg).execute()
+
     return {"circle": c}
 
 
 @api.get("/circles")
-async def list_circles(user: dict = Depends(current_user), mine: bool = False, dm: bool = False):
-    query: dict = {**_circle_visibility(user)}
+async def list_circles(
+    user: dict = Depends(current_user),
+    mine: bool = False,
+    dm: bool = False,
+):
+    query = supabase.table("circles").select("*")
+
+    if not _circle_visibility(user):
+        query = query.eq("verified_only", False)
+
     if dm:
-        query["type"] = "dm"
-        query["member_ids"] = user["id"]
+        query = query.eq("type", "dm").contains(
+            "member_ids", [user["id"]]
+        )
     else:
-        query["type"] = {"$ne": "dm"}
+        query = query.neq("type", "dm")
         if mine:
-            query["member_ids"] = user["id"]
-    circles = await db.circles.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+            query = query.contains(
+                "member_ids", [user["id"]]
+            )
+
+    result = (
+        query
+        .order("created_at", desc=True)
+        .limit(200)
+        .execute()
+    )
+    circles = result.data or []
+
     for c in circles:
         await decorate_circle(c, user)
+
         if dm:
-            last = await db.messages.find_one(
-                {"circle_id": c["id"], "system": False}, {"_id": 0}, sort=[("created_at", -1)]
+            last_result = (
+                supabase.table("messages")
+                .select("*")
+                .eq("circle_id", c["id"])
+                .eq("system", False)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
             )
-            c["last_message"] = last
+            c["last_message"] = (
+                last_result.data[0]
+                if last_result.data
+                else None
+            )
+
     return {"circles": circles}
 
 
 @api.get("/lounge")
 async def verified_lounge(user: dict = Depends(current_user)):
     """The private lounge only appears once a student is CSUF Verified. Verified users are auto-joined."""
-    lounge = await db.circles.find_one({"is_lounge": True}, {"_id": 0})
+    lounge_result = (
+        supabase.table("circles")
+        .select("*")
+        .eq("is_lounge", True)
+        .limit(1)
+        .execute()
+    )
+
+    lounge = lounge_result.data[0] if lounge_result.data else None
+
     if not lounge:
         return {"locked": True, "circle": None}
+
     if not user.get("verified"):
-        return {"locked": True, "circle": None, "member_count": len(lounge["member_ids"])}
-    if user["id"] not in lounge["member_ids"]:
-        await db.circles.update_one({"id": lounge["id"]}, {"$addToSet": {"member_ids": user["id"]}})
-        await db.messages.insert_one(_dm_system_msg(lounge["id"], f"{user['first_name']} unlocked the lounge ✓"))
-        lounge = await db.circles.find_one({"is_lounge": True}, {"_id": 0})
+        return {
+            "locked": True,
+            "circle": None,
+            "member_count": len(lounge.get("member_ids") or []),
+        }
+
+    member_ids = lounge.get("member_ids") or []
+
+    if user["id"] not in member_ids:
+        member_ids.append(user["id"])
+
+        supabase.table("circles").update(
+            {"member_ids": member_ids}
+        ).eq("id", lounge["id"]).execute()
+
+        msg = _dm_system_msg(
+            lounge["id"],
+            f"{user['first_name']} unlocked the lounge ✓",
+        )
+        supabase.table("messages").insert(msg).execute()
+
+        lounge_result = (
+            supabase.table("circles")
+            .select("*")
+            .eq("id", lounge["id"])
+            .limit(1)
+            .execute()
+        )
+        lounge = (
+            lounge_result.data[0]
+            if lounge_result.data
+            else lounge
+        )
+
     await decorate_circle(lounge, user)
-    return {"locked": False, "circle": lounge, "member_count": len(lounge["member_ids"])}
+
+    return {
+        "locked": False,
+        "circle": lounge,
+        "member_count": len(lounge.get("member_ids") or []),
+    }
 
 
 @api.get("/circles/{circle_id}")
-async def get_circle(circle_id: str, user: dict = Depends(current_user)):
-    c = await db.circles.find_one({"id": circle_id, **_circle_visibility(user)}, {"_id": 0})
+async def get_circle(
+    circle_id: str,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("circles")
+        .select("*")
+        .eq("id", circle_id)
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
     if not c:
         raise HTTPException(404, "Not found")
-    if c.get("type") == "dm" and user["id"] not in c["member_ids"]:
+
+    if c.get("verified_only") and not user.get("verified"):
         raise HTTPException(404, "Not found")
+
+    if (
+        c.get("type") == "dm"
+        and user["id"] not in (c.get("member_ids") or [])
+    ):
+        raise HTTPException(404, "Not found")
+
     await decorate_circle(c, user)
+
     if c.get("event_id"):
-        ev = await db.events.find_one({"id": c["event_id"]}, {"_id": 0})
-        c["event"] = ev
+        event_result = (
+            supabase.table("events")
+            .select("*")
+            .eq("id", c["event_id"])
+            .limit(1)
+            .execute()
+        )
+        c["event"] = (
+            event_result.data[0]
+            if event_result.data
+            else None
+        )
+
     return {"circle": c}
 
 
 @api.post("/circles/{circle_id}/join")
-async def join_circle(circle_id: str, user: dict = Depends(current_user)):
-    c = await db.circles.find_one({"id": circle_id})
+async def join_circle(
+    circle_id: str,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("circles")
+        .select("*")
+        .eq("id", circle_id)
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
     if not c:
         raise HTTPException(404, "Not found")
+
     if c.get("verified_only") and not user.get("verified"):
         raise HTTPException(403, "CSUF Verified students only")
+
     if c.get("type") == "dm":
         raise HTTPException(403, "Direct messages are private")
-    if user["id"] not in c["member_ids"]:
-        await db.circles.update_one({"id": circle_id}, {"$addToSet": {"member_ids": user["id"]}})
-        await db.messages.insert_one(_dm_system_msg(circle_id, f"{user['first_name']} joined the group"))
+
+    member_ids = c.get("member_ids") or []
+
+    if user["id"] not in member_ids:
+        member_ids.append(user["id"])
+
+        supabase.table("circles").update(
+            {"member_ids": member_ids}
+        ).eq("id", circle_id).execute()
+
+        msg = _dm_system_msg(
+            circle_id,
+            f"{user['first_name']} joined the group",
+        )
+        supabase.table("messages").insert(msg).execute()
+
     return {"ok": True}
 
 
 @api.post("/circles/{circle_id}/leave")
-async def leave_circle(circle_id: str, user: dict = Depends(current_user)):
-    await db.circles.update_one({"id": circle_id}, {"$pull": {"member_ids": user["id"]}})
+async def leave_circle(
+    circle_id: str,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("circles")
+        .select("member_ids")
+        .eq("id", circle_id)
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
+    if c:
+        member_ids = [
+            member_id
+            for member_id in (c.get("member_ids") or [])
+            if member_id != user["id"]
+        ]
+
+        supabase.table("circles").update(
+            {"member_ids": member_ids}
+        ).eq("id", circle_id).execute()
+
     return {"ok": True}
 
 
 @api.get("/circles/{circle_id}/messages")
-async def circle_messages(circle_id: str, user: dict = Depends(current_user), since: Optional[str] = None):
-    c = await db.circles.find_one({"id": circle_id}, {"_id": 0, "member_ids": 1})
+async def circle_messages(
+    circle_id: str,
+    user: dict = Depends(current_user),
+    since: Optional[str] = None,
+):
+    result = (
+        supabase.table("circles")
+        .select("member_ids")
+        .eq("id", circle_id)
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
     if not c:
         raise HTTPException(404, "Not found")
-    if user["id"] not in c["member_ids"]:
+
+    if user["id"] not in (c.get("member_ids") or []):
         raise HTTPException(403, "Join this Circle to see messages")
-    query: dict = {"circle_id": circle_id}
+
+    query = (
+        supabase.table("messages")
+        .select("*")
+        .eq("circle_id", circle_id)
+    )
+
     if since:
-        query["created_at"] = {"$gt": since}
-    msgs = await db.messages.find(query, {"_id": 0}).sort("created_at", 1).to_list(500)
-    # attach sender names
-    ids = list({m["sender_id"] for m in msgs if m["sender_id"] != "system"})
-    users = await db.users.find({"id": {"$in": ids}}, {"_id": 0, "password_hash": 0}).to_list(200)
+        query = query.gt("created_at", since)
+
+    result = (
+        query
+        .order("created_at")
+        .limit(500)
+        .execute()
+    )
+
+    msgs = result.data or []
+
+    ids = list({
+        m["sender_id"]
+        for m in msgs
+        if m.get("sender_id") != "system"
+    })
+
+    if ids:
+        users_result = (
+            supabase.table("users")
+            .select("*")
+            .in_("id", ids)
+            .limit(200)
+            .execute()
+        )
+        users = users_result.data or []
+    else:
+        users = []
+
     umap = {u["id"]: u for u in users}
+
     for m in msgs:
-        if m["sender_id"] == "system":
+        if m.get("sender_id") == "system":
             m["sender"] = None
         else:
-            u = umap.get(m["sender_id"])
-            m["sender"] = public_user(u) if u else None
+            sender = umap.get(m.get("sender_id"))
+            m["sender"] = public_user(sender) if sender else None
+
     return {"messages": msgs}
 
 
 @api.post("/circles/{circle_id}/messages")
-async def send_message(circle_id: str, body: MessageBody, user: dict = Depends(current_user)):
-    c = await db.circles.find_one({"id": circle_id})
-    if not c or user["id"] not in c["member_ids"]:
+async def send_message(
+    circle_id: str,
+    body: MessageBody,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("circles")
+        .select("*")
+        .eq("id", circle_id)
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
+    if not c or user["id"] not in (c.get("member_ids") or []):
         raise HTTPException(403, "Not a member")
+
     if c.get("verified_only") and not user.get("verified"):
         raise HTTPException(403, "CSUF Verified students only")
+
     msg = {
         "id": str(uuid.uuid4()),
         "circle_id": circle_id,
@@ -717,9 +1083,11 @@ async def send_message(circle_id: str, body: MessageBody, user: dict = Depends(c
         "system": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.messages.insert_one(msg)
-    msg.pop("_id", None)
+
+    supabase.table("messages").insert(msg).execute()
+
     msg["sender"] = public_user(user)
+
     return {"message": msg}
 
 
@@ -727,26 +1095,67 @@ async def send_message(circle_id: str, body: MessageBody, user: dict = Depends(c
 # Routes: Connections (1:1)
 # ---------------------------------------------------------------------------
 async def connection_state(me: str, other: str) -> dict:
-    c = await db.connections.find_one(
-        {
-            "status": {"$in": ["pending", "accepted"]},
-            "$or": [{"from_id": me, "to_id": other}, {"from_id": other, "to_id": me}],
-        },
-        {"_id": 0},
+    result = (
+        supabase.table("connections")
+        .select("*")
+        .in_("status", ["pending", "accepted"])
+        .or_(
+            f"and(from_id.eq.{me},to_id.eq.{other}),"
+            f"and(from_id.eq.{other},to_id.eq.{me})"
+        )
+        .limit(1)
+        .execute()
     )
+
+    c = result.data[0] if result.data else None
+
     if not c:
-        return {"status": "none", "id": None, "circle_id": None}
+        return {
+            "status": "none",
+            "id": None,
+            "circle_id": None,
+        }
+
     if c["status"] == "accepted":
         status = "connected"
     else:
-        status = "pending_out" if c["from_id"] == me else "pending_in"
-    return {"status": status, "id": c["id"], "circle_id": c.get("circle_id")}
+        status = (
+            "pending_out"
+            if c["from_id"] == me
+            else "pending_in"
+        )
+
+    return {
+        "status": status,
+        "id": c["id"],
+        "circle_id": c.get("circle_id"),
+    }
 
 
 async def _accept_connection(c: dict) -> dict:
-    a = await db.users.find_one({"id": c["from_id"]}, {"_id": 0, "password_hash": 0})
-    b = await db.users.find_one({"id": c["to_id"]}, {"_id": 0, "password_hash": 0})
-    shared = list(set((a or {}).get("interests") or []) & set((b or {}).get("interests") or []))
+    a_result = (
+        supabase.table("users")
+        .select("*")
+        .eq("id", c["from_id"])
+        .limit(1)
+        .execute()
+    )
+    b_result = (
+        supabase.table("users")
+        .select("*")
+        .eq("id", c["to_id"])
+        .limit(1)
+        .execute()
+    )
+
+    a = a_result.data[0] if a_result.data else None
+    b = b_result.data[0] if b_result.data else None
+
+    shared = list(
+        set((a or {}).get("interests") or [])
+        & set((b or {}).get("interests") or [])
+    )
+
     dm = {
         "id": str(uuid.uuid4()),
         "type": "dm",
@@ -755,40 +1164,96 @@ async def _accept_connection(c: dict) -> dict:
         "member_ids": [c["from_id"], c["to_id"]],
         "interests": shared[:5],
         "event_id": None,
-        "connection_id": c["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.circles.insert_one(dm)
+
+    supabase.table("circles").insert(dm).execute()
+
     intro = "You're connected! Say hi 👋"
     if shared:
         intro += f" — you both like {shared[0]}"
-    await db.messages.insert_one(_dm_system_msg(dm["id"], intro))
-    await db.connections.update_one(
-        {"id": c["id"]},
-        {"$set": {"status": "accepted", "circle_id": dm["id"], "accepted_at": datetime.now(timezone.utc).isoformat()}},
-    )
-    return {"status": "connected", "id": c["id"], "circle_id": dm["id"]}
+
+    supabase.table("messages").insert(
+        _dm_system_msg(dm["id"], intro)
+    ).execute()
+
+    supabase.table("connections").update(
+        {
+            "status": "accepted",
+            "circle_id": dm["id"],
+            "accepted_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", c["id"]).execute()
+
+    return {
+        "status": "connected",
+        "id": c["id"],
+        "circle_id": dm["id"],
+    }
 
 
 @api.post("/connections/{user_id}")
-async def request_connection(user_id: str, user: dict = Depends(current_user)):
+async def request_connection(
+    user_id: str,
+    user: dict = Depends(current_user),
+):
     if user_id == user["id"]:
-        raise HTTPException(400, "You can't connect with yourself")
-    target = await db.users.find_one({"id": user_id})
+        raise HTTPException(
+            400,
+            "You can't connect with yourself",
+        )
+
+    target_result = (
+        supabase.table("users")
+        .select("*")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+
+    target = (
+        target_result.data[0]
+        if target_result.data
+        else None
+    )
+
     if not target:
         raise HTTPException(404, "User not found")
-    existing = await db.connections.find_one(
-        {
-            "status": {"$in": ["pending", "accepted"]},
-            "$or": [{"from_id": user["id"], "to_id": user_id}, {"from_id": user_id, "to_id": user["id"]}],
-        },
-        {"_id": 0},
+
+    existing_result = (
+        supabase.table("connections")
+        .select("*")
+        .in_("status", ["pending", "accepted"])
+        .or_(
+            f"and(from_id.eq.{user['id']},to_id.eq.{user_id}),"
+            f"and(from_id.eq.{user_id},to_id.eq.{user['id']})"
+        )
+        .limit(1)
+        .execute()
     )
+
+    existing = (
+        existing_result.data[0]
+        if existing_result.data
+        else None
+    )
+
     if existing:
-        if existing["status"] == "pending" and existing["to_id"] == user["id"]:
-            # They already asked — tapping Connect is mutual, open the chat.
-            return {"connection": await _accept_connection(existing)}
-        return {"connection": await connection_state(user["id"], user_id)}
+        if (
+            existing["status"] == "pending"
+            and existing["to_id"] == user["id"]
+        ):
+            return {
+                "connection": await _accept_connection(existing)
+            }
+
+        return {
+            "connection": await connection_state(
+                user["id"],
+                user_id,
+            )
+        }
+
     c = {
         "id": str(uuid.uuid4()),
         "from_id": user["id"],
@@ -796,53 +1261,145 @@ async def request_connection(user_id: str, user: dict = Depends(current_user)):
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.connections.insert_one(c)
-    return {"connection": {"status": "pending_out", "id": c["id"], "circle_id": None}}
+
+    supabase.table("connections").insert(c).execute()
+
+    return {
+        "connection": {
+            "status": "pending_out",
+            "id": c["id"],
+            "circle_id": None,
+        }
+    }
 
 
 @api.get("/connections")
 async def list_connections(user: dict = Depends(current_user)):
-    conns = await db.connections.find(
-        {"status": {"$in": ["pending", "accepted"]}, "$or": [{"from_id": user["id"]}, {"to_id": user["id"]}]},
-        {"_id": 0},
-    ).sort("created_at", -1).to_list(300)
-    other_ids = list({c["to_id"] if c["from_id"] == user["id"] else c["from_id"] for c in conns})
-    users = await db.users.find({"id": {"$in": other_ids}}, {"_id": 0, "password_hash": 0}).to_list(300)
+    result = (
+        supabase.table("connections")
+        .select("*")
+        .in_("status", ["pending", "accepted"])
+        .or_(
+            f"from_id.eq.{user['id']},to_id.eq.{user['id']}"
+        )
+        .order("created_at", desc=True)
+        .limit(300)
+        .execute()
+    )
+
+    conns = result.data or []
+
+    other_ids = list({
+        c["to_id"]
+        if c["from_id"] == user["id"]
+        else c["from_id"]
+        for c in conns
+    })
+
+    if other_ids:
+        users_result = (
+            supabase.table("users")
+            .select("*")
+            .in_("id", other_ids)
+            .limit(300)
+            .execute()
+        )
+        users = users_result.data or []
+    else:
+        users = []
+
     umap = {u["id"]: u for u in users}
-    incoming, outgoing, connected = [], [], []
+
+    incoming = []
+    outgoing = []
+    connected = []
+
     for c in conns:
-        other_id = c["to_id"] if c["from_id"] == user["id"] else c["from_id"]
+        other_id = (
+            c["to_id"]
+            if c["from_id"] == user["id"]
+            else c["from_id"]
+        )
+
         o = umap.get(other_id)
+
         if not o:
             continue
+
         score, reasons = compatibility(user, o)
-        item = {"id": c["id"], "user": public_user(o), "compatibility": score, "reasons": reasons[:2],
-                "circle_id": c.get("circle_id"), "created_at": c["created_at"]}
+
+        item = {
+            "id": c["id"],
+            "user": public_user(o),
+            "compatibility": score,
+            "reasons": reasons[:2],
+            "circle_id": c.get("circle_id"),
+            "created_at": c["created_at"],
+        }
+
         if c["status"] == "accepted":
             connected.append(item)
         elif c["to_id"] == user["id"]:
             incoming.append(item)
         else:
             outgoing.append(item)
-    return {"incoming": incoming, "outgoing": outgoing, "connected": connected}
+
+    return {
+        "incoming": incoming,
+        "outgoing": outgoing,
+        "connected": connected,
+    }
 
 
 @api.post("/connections/{connection_id}/accept")
-async def accept_connection(connection_id: str, user: dict = Depends(current_user)):
-    c = await db.connections.find_one({"id": connection_id, "to_id": user["id"], "status": "pending"}, {"_id": 0})
+async def accept_connection(
+    connection_id: str,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("connections")
+        .select("*")
+        .eq("id", connection_id)
+        .eq("to_id", user["id"])
+        .eq("status", "pending")
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
     if not c:
         raise HTTPException(404, "Request not found")
-    return {"connection": await _accept_connection(c)}
+
+    return {
+        "connection": await _accept_connection(c)
+    }
 
 
 @api.post("/connections/{connection_id}/decline")
-async def decline_connection(connection_id: str, user: dict = Depends(current_user)):
-    r = await db.connections.update_one(
-        {"id": connection_id, "status": "pending", "$or": [{"to_id": user["id"]}, {"from_id": user["id"]}]},
-        {"$set": {"status": "declined"}},
+async def decline_connection(
+    connection_id: str,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("connections")
+        .select("id")
+        .eq("id", connection_id)
+        .eq("status", "pending")
+        .or_(
+            f"to_id.eq.{user['id']},from_id.eq.{user['id']}"
+        )
+        .limit(1)
+        .execute()
     )
-    if r.matched_count == 0:
+
+    if not result.data:
         raise HTTPException(404, "Request not found")
+
+    supabase.table("connections").update(
+        {"status": "declined"}
+    ).eq("id", connection_id).execute()
+
     return {"ok": True}
 
 
@@ -850,21 +1407,58 @@ async def decline_connection(connection_id: str, user: dict = Depends(current_us
 # Routes: Weekend digest + event reminders
 # ---------------------------------------------------------------------------
 def event_start(e: dict) -> Optional[datetime]:
-    raw = f"{e.get('date', '')} {(e.get('time') or '').strip().upper().replace('.', '')}"
-    for fmt in ("%Y-%m-%d %I:%M %p", "%Y-%m-%d %I%p", "%Y-%m-%d %I %p", "%Y-%m-%d %H:%M"):
+    raw = (
+        f"{e.get('date', '')} "
+        f"{(e.get('time') or '').strip().upper().replace('.', '')}"
+    )
+
+    for fmt in (
+        "%Y-%m-%d %I:%M %p",
+        "%Y-%m-%d %I%p",
+        "%Y-%m-%d %I %p",
+        "%Y-%m-%d %H:%M",
+    ):
         try:
-            return datetime.strptime(raw, fmt).replace(tzinfo=CAMPUS_TZ)
+            return datetime.strptime(
+                raw,
+                fmt,
+            ).replace(tzinfo=CAMPUS_TZ)
         except ValueError:
             continue
+
     return None
 
 
 async def _attach_event_meta(e: dict, user: dict):
-    e["interested_count"] = await db.event_attendees.count_documents(
-        {"event_id": e["id"], "status": {"$in": ["interested", "going"]}}
+    interested_result = (
+        supabase.table("event_attendees")
+        .select("user_id", count="exact")
+        .eq("event_id", e["id"])
+        .in_("status", ["interested", "going"])
+        .execute()
     )
-    e["going_count"] = await db.event_attendees.count_documents({"event_id": e["id"], "status": "going"})
-    att = await db.event_attendees.find_one({"event_id": e["id"], "user_id": user["id"]}, {"_id": 0})
+
+    going_result = (
+        supabase.table("event_attendees")
+        .select("user_id", count="exact")
+        .eq("event_id", e["id"])
+        .eq("status", "going")
+        .execute()
+    )
+
+    att_result = (
+        supabase.table("event_attendees")
+        .select("*")
+        .eq("event_id", e["id"])
+        .eq("user_id", user["id"])
+        .limit(1)
+        .execute()
+    )
+
+    att = att_result.data[0] if att_result.data else None
+
+    e["interested_count"] = interested_result.count or 0
+    e["going_count"] = going_result.count or 0
     e["my_status"] = att["status"] if att else None
 
 
@@ -872,48 +1466,159 @@ async def _attach_event_meta(e: dict, user: dict):
 async def weekend_digest(user: dict = Depends(current_user)):
     now = datetime.now(CAMPUS_TZ)
     today = now.date()
-    wd = today.weekday()  # Mon=0 .. Sun=6
-    friday = today + timedelta(days=(4 - wd)) if wd <= 4 else today - timedelta(days=wd - 4)
+    wd = today.weekday()
+
+    friday = (
+        today + timedelta(days=(4 - wd))
+        if wd <= 4
+        else today - timedelta(days=wd - 4)
+    )
+
     days = [friday + timedelta(days=i) for i in range(3)]
-    day_strs = [d.strftime("%Y-%m-%d") for d in days if d >= today]
-    events = await db.events.find({"date": {"$in": day_strs}}, {"_id": 0}).sort("date", 1).to_list(200)
+    day_strs = [
+        d.strftime("%Y-%m-%d")
+        for d in days
+        if d >= today
+    ]
+
+    result = (
+        supabase.table("events")
+        .select("*")
+        .in_("date", day_strs)
+        .order("date")
+        .limit(200)
+        .execute()
+    )
+
+    events = result.data or []
     rolled = False
+
     if wd >= 5 and not events:
-        # Weekend is wrapping up with nothing left — look ahead to next weekend.
         rolled = True
         friday = friday + timedelta(days=7)
-        days = [friday + timedelta(days=i) for i in range(3)]
-        day_strs = [d.strftime("%Y-%m-%d") for d in days]
-        events = await db.events.find({"date": {"$in": day_strs}}, {"_id": 0}).sort("date", 1).to_list(200)
+        days = [
+            friday + timedelta(days=i)
+            for i in range(3)
+        ]
+        day_strs = [
+            d.strftime("%Y-%m-%d")
+            for d in days
+        ]
 
-    # Who I vibe with (>=60) so the digest can say "3 people you match with are going"
-    others = await db.users.find({"id": {"$ne": user["id"]}, "onboarded": True}, {"_id": 0, "password_hash": 0}).to_list(500)
-    vibe_ids = {o["id"] for o in others if compatibility(user, o)[0] >= 60}
+        result = (
+            supabase.table("events")
+            .select("*")
+            .in_("date", day_strs)
+            .order("date")
+            .limit(200)
+            .execute()
+        )
 
-    by_day: dict = {d: [] for d in day_strs}
+        events = result.data or []
+
+    others_result = (
+        supabase.table("users")
+        .select("*")
+        .neq("id", user["id"])
+        .eq("onboarded", True)
+        .limit(500)
+        .execute()
+    )
+
+    others = others_result.data or []
+
+    vibe_ids = {
+        o["id"]
+        for o in others
+        if compatibility(user, o)[0] >= 60
+    }
+
+    by_day = {d: [] for d in day_strs}
+
     for e in events:
         await _attach_event_meta(e, user)
-        atts = await db.event_attendees.find({"event_id": e["id"]}, {"_id": 0, "user_id": 1}).to_list(500)
-        e["vibe_count"] = sum(1 for a in atts if a["user_id"] in vibe_ids)
-        by_day[e["date"]].append(e)
 
-    labels = {0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday", 4: "Friday", 5: "Saturday", 6: "Sunday"}
+        att_result = (
+            supabase.table("event_attendees")
+            .select("user_id")
+            .eq("event_id", e["id"])
+            .limit(500)
+            .execute()
+        )
+
+        atts = att_result.data or []
+
+        e["vibe_count"] = sum(
+            1
+            for a in atts
+            if a["user_id"] in vibe_ids
+        )
+
+        if e["date"] in by_day:
+            by_day[e["date"]].append(e)
+
+    labels = {
+        0: "Monday",
+        1: "Tuesday",
+        2: "Wednesday",
+        3: "Thursday",
+        4: "Friday",
+        5: "Saturday",
+        6: "Sunday",
+    }
+
     out_days = []
+
     for d in days:
         ds = d.strftime("%Y-%m-%d")
+
         if ds not in by_day:
             continue
-        evs = sorted(by_day[ds], key=lambda x: (event_start(x) or now).timestamp())
-        out_days.append({"date": ds, "label": labels[d.weekday()], "short": d.strftime("%b %d"), "events": evs})
 
-    total = sum(len(d["events"]) for d in out_days)
-    label = f"{days[0].strftime('%b %d')} – {days[2].strftime('%b %d')}"
+        evs = sorted(
+            by_day[ds],
+            key=lambda x: (
+                event_start(x) or now
+            ).timestamp(),
+        )
+
+        out_days.append(
+            {
+                "date": ds,
+                "label": labels[d.weekday()],
+                "short": d.strftime("%b %d"),
+                "events": evs,
+            }
+        )
+
+    total = sum(
+        len(d["events"])
+        for d in out_days
+    )
+
+    label = (
+        f"{days[0].strftime('%b %d')} – "
+        f"{days[2].strftime('%b %d')}"
+    )
+
     return {
         "is_friday": wd == 4,
         "is_weekend": wd >= 4,
         "weekend_label": label,
         "total_events": total,
-        "headline": "Happy Friday! Here's your weekend" if wd == 4 else ("Next weekend on campus" if rolled else "This weekend on campus" if wd >= 5 else "Plan ahead: this weekend on campus"),
+        "headline": (
+            "Happy Friday! Here's your weekend"
+            if wd == 4
+            else (
+                "Next weekend on campus"
+                if rolled
+                else (
+                    "This weekend on campus"
+                    if wd >= 5
+                    else "Plan ahead: this weekend on campus"
+                )
+            )
+        ),
         "days": out_days,
     }
 
@@ -925,41 +1630,93 @@ REMINDER_WINDOW_MIN = 120
 async def upcoming_reminders(user: dict = Depends(current_user)):
     """Events the user RSVPed to that start within the next 2 hours."""
     now = datetime.now(CAMPUS_TZ)
-    atts = await db.event_attendees.find(
-        {"user_id": user["id"], "status": {"$in": ["going", "interested"]}}, {"_id": 0}
-    ).to_list(500)
+
+    att_result = (
+        supabase.table("event_attendees")
+        .select("*")
+        .eq("user_id", user["id"])
+        .in_("status", ["going", "interested"])
+        .limit(500)
+        .execute()
+    )
+
+    atts = att_result.data or []
+
     if not atts:
         return {"reminders": []}
+
     ids = [a["event_id"] for a in atts]
-    status_map = {a["event_id"]: a["status"] for a in atts}
+    status_map = {
+        a["event_id"]: a["status"]
+        for a in atts
+    }
+
+    dismissed_result = (
+        supabase.table("reminder_dismissals")
+        .select("event_id")
+        .eq("user_id", user["id"])
+        .limit(500)
+        .execute()
+    )
+
     dismissed = {
         d["event_id"]
-        for d in await db.reminder_dismissals.find({"user_id": user["id"]}, {"_id": 0, "event_id": 1}).to_list(500)
+        for d in (dismissed_result.data or [])
     }
-    events = await db.events.find({"id": {"$in": ids}}, {"_id": 0}).to_list(500)
+
+    events_result = (
+        supabase.table("events")
+        .select("*")
+        .in_("id", ids)
+        .limit(500)
+        .execute()
+    )
+
+    events = events_result.data or []
+
     out = []
+
     for e in events:
         if e["id"] in dismissed:
             continue
+
         start = event_start(e)
+
         if not start:
             continue
-        mins = int((start - now).total_seconds() // 60)
+
+        mins = int(
+            (start - now).total_seconds() // 60
+        )
+
         if 0 <= mins <= REMINDER_WINDOW_MIN:
             e["starts_in_minutes"] = mins
             e["my_status"] = status_map.get(e["id"])
             out.append(e)
-    out.sort(key=lambda x: x["starts_in_minutes"])
+
+    out.sort(
+        key=lambda x: x["starts_in_minutes"]
+    )
+
     return {"reminders": out}
 
 
 @api.post("/reminders/{event_id}/dismiss")
-async def dismiss_reminder(event_id: str, user: dict = Depends(current_user)):
-    await db.reminder_dismissals.update_one(
-        {"user_id": user["id"], "event_id": event_id},
-        {"$set": {"user_id": user["id"], "event_id": event_id, "dismissed_at": datetime.now(timezone.utc).isoformat()}},
-        upsert=True,
-    )
+async def dismiss_reminder(
+    event_id: str,
+    user: dict = Depends(current_user),
+):
+    supabase.table("reminder_dismissals").upsert(
+        {
+            "user_id": user["id"],
+            "event_id": event_id,
+            "dismissed_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        },
+        on_conflict="user_id,event_id",
+    ).execute()
+
     return {"ok": True}
 
 
@@ -967,7 +1724,10 @@ async def dismiss_reminder(event_id: str, user: dict = Depends(current_user)):
 # Routes: Recommendations
 # ---------------------------------------------------------------------------
 @api.post("/recommendations")
-async def create_recommendation(body: RecommendationCreateBody, user: dict = Depends(current_user)):
+async def create_recommendation(
+    body: RecommendationCreateBody,
+    user: dict = Depends(current_user),
+):
     r = {
         "id": str(uuid.uuid4()),
         "creator_id": user["id"],
@@ -977,20 +1737,34 @@ async def create_recommendation(body: RecommendationCreateBody, user: dict = Dep
         "saves": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.recommendations.insert_one(r)
-    r.pop("_id", None)
+
+    supabase.table("recommendations").insert(r).execute()
+
     return {"recommendation": r}
 
 
 @api.get("/recommendations")
-async def list_recommendations(q: Optional[str] = Query(None, max_length=80)):
-    query: dict = {}
+async def list_recommendations(
+    q: Optional[str] = Query(None, max_length=80),
+):
+    result = (
+        supabase.table("recommendations")
+        .select("*")
+        .order("created_at", desc=True)
+        .limit(200)
+        .execute()
+    )
+
+    recs = result.data or []
+
     if q:
-        query["$or"] = [
-            {"title": {"$regex": re.escape(q), "$options": "i"}},
-            {"description": {"$regex": re.escape(q), "$options": "i"}},
+        search = q.lower()
+        recs = [
+            r for r in recs
+            if search in (r.get("title") or "").lower()
+            or search in (r.get("description") or "").lower()
         ]
-    recs = await db.recommendations.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+
     return {"recommendations": recs}
 
 
@@ -999,15 +1773,31 @@ async def list_recommendations(q: Optional[str] = Query(None, max_length=80)):
 # ---------------------------------------------------------------------------
 @api.get("/clubs")
 async def list_clubs():
-    clubs = await db.clubs.find({}, {"_id": 0}).to_list(200)
-    return {"clubs": clubs}
+    result = (
+        supabase.table("clubs")
+        .select("*")
+        .limit(200)
+        .execute()
+    )
+
+    return {"clubs": result.data or []}
 
 
 @api.get("/clubs/{club_id}")
 async def get_club(club_id: str):
-    c = await db.clubs.find_one({"id": club_id}, {"_id": 0})
+    result = (
+        supabase.table("clubs")
+        .select("*")
+        .eq("id", club_id)
+        .limit(1)
+        .execute()
+    )
+
+    c = result.data[0] if result.data else None
+
     if not c:
         raise HTTPException(404, "Not found")
+
     return {"club": c}
 
 
@@ -1015,29 +1805,58 @@ async def get_club(club_id: str):
 # Routes: Reports / Block
 # ---------------------------------------------------------------------------
 @api.post("/reports")
-async def create_report(body: ReportBody, user: dict = Depends(current_user)):
-    await db.reports.insert_one(
-        {
-            "id": str(uuid.uuid4()),
-            "reporter_id": user["id"],
-            "target_type": body.target_type,
-            "target_id": body.target_id,
-            "reason": body.reason,
-            "status": "open",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+async def create_report(
+    body: ReportBody,
+    user: dict = Depends(current_user),
+):
+    report = {
+        "id": str(uuid.uuid4()),
+        "reporter_id": user["id"],
+        "target_type": body.target_type,
+        "target_id": body.target_id,
+        "reason": body.reason,
+        "status": "open",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    supabase.table("reports").insert(report).execute()
+
     return {"ok": True}
 
 
 @api.post("/block/{user_id}")
-async def block_user(user_id: str, user: dict = Depends(current_user)):
-    await db.users.update_one({"id": user["id"]}, {"$addToSet": {"blocked": user_id}})
+async def block_user(
+    user_id: str,
+    user: dict = Depends(current_user),
+):
+    result = (
+        supabase.table("users")
+        .select("blocked")
+        .eq("id", user["id"])
+        .limit(1)
+        .execute()
+    )
+
+    current = (
+        result.data[0]
+        if result.data
+        else {}
+    )
+
+    blocked = list(current.get("blocked") or [])
+
+    if user_id not in blocked:
+        blocked.append(user_id)
+
+    supabase.table("users").update(
+        {"blocked": blocked}
+    ).eq("id", user["id"]).execute()
+
     return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
-# Uploads (Emergent Object Storage)
+# Uploads (Supabase Storage)
 # ---------------------------------------------------------------------------
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": "jpg",
@@ -1047,71 +1866,158 @@ ALLOWED_IMAGE_TYPES = {
     "image/heic": "heic",
     "image/heif": "heif",
 }
+
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+SUPABASE_STORAGE_BUCKET = "circle-uploads"
 
 
 @api.post("/upload")
-async def upload_file(file: UploadFile = File(...), user: dict = Depends(current_user)):
-    content_type = (file.content_type or "").split(";")[0].strip().lower()
+async def upload_file(
+    file: UploadFile = File(...),
+    user: dict = Depends(current_user),
+):
+    content_type = (
+        (file.content_type or "")
+        .split(";")[0]
+        .strip()
+        .lower()
+    )
+
     if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(415, "Only JPEG, PNG, WEBP, GIF or HEIC images are allowed")
+        raise HTTPException(
+            415,
+            "Only JPEG, PNG, WEBP, GIF or HEIC images are allowed",
+        )
+
     data = await file.read(MAX_UPLOAD_BYTES + 1)
+
     if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "Image must be under 10 MB")
+        raise HTTPException(
+            413,
+            "Image must be under 10 MB",
+        )
+
     if not data:
         raise HTTPException(400, "Empty file")
-    key = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{ALLOWED_IMAGE_TYPES[content_type]}"
-    try:
-        await run_in_threadpool(_put_object_sync, key, data, content_type)
-    except requests.HTTPError as e:
-        code = e.response.status_code if e.response is not None else 500
-        if code == 402:
-            raise HTTPException(402, "Storage credit exhausted")
-        raise HTTPException(500, f"Upload failed: {code}")
-    await db.uploads.insert_one(
-        {
-            "path": key,
-            "owner_id": user["id"],
-            "content_type": content_type,
-            "size": len(data),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+
+    key = (
+        f"{APP_NAME}/uploads/"
+        f"{user['id']}/"
+        f"{uuid.uuid4()}."
+        f"{ALLOWED_IMAGE_TYPES[content_type]}"
     )
-    # Return download URL
-    return {"path": key, "url": f"/api/files/{key}"}
+
+    try:
+        supabase.storage.from_(
+            SUPABASE_STORAGE_BUCKET
+        ).upload(
+            key,
+            data,
+            {
+                "content-type": content_type,
+                "upsert": False,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Supabase storage upload failed: {e}")
+        raise HTTPException(
+            500,
+            "Upload failed",
+        )
+
+    upload_meta = {
+        "path": key,
+        "owner_id": user["id"],
+        "content_type": content_type,
+        "size": len(data),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    supabase.table("uploads").insert(
+        upload_meta
+    ).execute()
+
+    return {
+        "path": key,
+        "url": f"/api/files/{key}",
+    }
 
 
 @api.get("/files/{path:path}")
-async def download_file(path: str, token: Optional[str] = None, authorization: Optional[str] = Header(None)):
-    # Accept token in query or bearer
+async def download_file(
+    path: str,
+    token: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
+):
     ok = False
+
     if authorization and authorization.startswith("Bearer "):
         try:
-            jwt.decode(authorization[7:], JWT_SECRET, algorithms=["HS256"])
+            jwt.decode(
+                authorization[7:],
+                JWT_SECRET,
+                algorithms=["HS256"],
+            )
             ok = True
         except Exception:
             pass
+
     if not ok and token:
         try:
-            jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            jwt.decode(
+                token,
+                JWT_SECRET,
+                algorithms=["HS256"],
+            )
             ok = True
         except Exception:
             pass
+
     if not ok:
         raise HTTPException(401, "Auth required")
-    meta = await db.uploads.find_one({"path": path})
+
+    meta_result = (
+        supabase.table("uploads")
+        .select("*")
+        .eq("path", path)
+        .limit(1)
+        .execute()
+    )
+
+    meta = (
+        meta_result.data[0]
+        if meta_result.data
+        else None
+    )
+
     if not meta:
         raise HTTPException(404, "Not found")
+
     try:
-        content, _ct = await run_in_threadpool(_get_object_sync, path)
+        content = supabase.storage.from_(
+            SUPABASE_STORAGE_BUCKET
+        ).download(path)
     except Exception:
-        raise HTTPException(500, "Read failed")
-    # Serve with the allow-listed type recorded at upload, never the caller-influenced one.
-    safe_ct = meta.get("content_type") if meta.get("content_type") in ALLOWED_IMAGE_TYPES else "application/octet-stream"
+        raise HTTPException(
+            500,
+            "Read failed",
+        )
+
+    safe_ct = (
+        meta.get("content_type")
+        if meta.get("content_type")
+        in ALLOWED_IMAGE_TYPES
+        else "application/octet-stream"
+    )
+
     return Response(
         content=content,
         media_type=safe_ct,
-        headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": "inline", "Cache-Control": "private, max-age=3600"},
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": "inline",
+            "Cache-Control": "private, max-age=3600",
+        },
     )
 
 
@@ -1120,14 +2026,17 @@ async def download_file(path: str, token: Optional[str] = None, authorization: O
 # ---------------------------------------------------------------------------
 @api.get("/health")
 async def health():
-    return {"ok": True, "time": datetime.now(timezone.utc).isoformat()}
+    return {
+        "ok": True,
+        "time": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 app.include_router(api)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=False,  # bearer tokens only; no cookies — safe with wildcard origins
+    allow_credentials=False,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1137,10 +2046,22 @@ app.add_middleware(
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
-    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
-    resp.headers.setdefault("X-Frame-Options", "DENY")
-    resp.headers.setdefault("Referrer-Policy", "no-referrer")
-    resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    resp.headers.setdefault(
+        "X-Content-Type-Options",
+        "nosniff",
+    )
+    resp.headers.setdefault(
+        "X-Frame-Options",
+        "DENY",
+    )
+    resp.headers.setdefault(
+        "Referrer-Policy",
+        "no-referrer",
+    )
+    resp.headers.setdefault(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains",
+    )
     return resp
 
 
@@ -1149,17 +2070,16 @@ async def security_headers(request: Request, call_next):
 # ---------------------------------------------------------------------------
 from seed_data import seed_all, seed_lounge  # noqa: E402
 
-
 @app.on_event("startup")
 async def on_start():
     try:
-        await seed_all(db, hash_password)
-        await seed_lounge(db)
+        await seed_all(supabase, hash_password)
+        await seed_lounge(supabase)
         logger.info("Seed check complete")
     except Exception as e:
         logger.error(f"Seed failed: {e}")
 
-
 @app.on_event("shutdown")
 async def on_stop():
-    client.close()
+    if client:
+        client.close()
