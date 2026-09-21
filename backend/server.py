@@ -1,11 +1,10 @@
 """CIRCLE - Campus social discovery MVP backend."""
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Header, Query, Request
 from fastapi.responses import Response
-from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Any
+from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os
@@ -13,7 +12,6 @@ import uuid
 import logging
 import bcrypt
 import jwt
-import random
 import re
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
@@ -120,7 +118,6 @@ class OnboardingBody(BaseModel):
     year: Optional[str] = None
     major: Optional[str] = None
     lives_on_campus: Optional[bool] = None
-    campus_area: Optional[str] = None
     availability_days: List[str] = []
     availability_times: List[str] = []
     profile_photo_url: Optional[str] = None
@@ -128,12 +125,12 @@ class OnboardingBody(BaseModel):
 
 
 class EventCreateBody(BaseModel):
-    title: str
-    description: str
-    date: str  # ISO
-    time: str
-    location: str
-    category: str
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=2000)
+    date: str = Field(min_length=10, max_length=10)  # YYYY-MM-DD
+    time: str = Field(min_length=1, max_length=40)
+    location: str = Field(min_length=1, max_length=160)
+    category: str = Field(min_length=1, max_length=60)
     tags: List[str] = []
     capacity: Optional[int] = None
     cover_image_url: Optional[str] = None
@@ -141,16 +138,16 @@ class EventCreateBody(BaseModel):
 
 
 class RecommendationCreateBody(BaseModel):
-    title: str
-    description: str
-    category: str
-    location: Optional[str] = None
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=2000)
+    category: str = Field(min_length=1, max_length=60)
+    location: Optional[str] = Field(default=None, max_length=160)
     tags: List[str] = []
     image_url: Optional[str] = None
 
 
 class CircleCreateBody(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=120)
     interests: List[str] = []
     member_ids: List[str] = []
     event_id: Optional[str] = None
@@ -164,7 +161,7 @@ class MessageBody(BaseModel):
 class ReportBody(BaseModel):
     target_type: str  # user | event | circle
     target_id: str
-    reason: str
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +395,8 @@ async def list_users(user: dict = Depends(current_user), q: Optional[str] = Quer
             f"first_name.ilike.*{search}*,last_name.ilike.*{search}*,major.ilike.*{search}*"
         )
     result = query.limit(200).execute()
-    users = result.data
+    blocked = set(user.get("blocked") or [])
+    users = [u for u in (result.data or []) if u.get("id") not in blocked]
     return {"users": [public_user(u) for u in users]}
 
 
@@ -441,7 +439,9 @@ async def list_events(
             or any(search in str(tag).lower() for tag in (e.get("tags") or []))
         ]
 
-    events.sort(key=lambda x: x.get("date") or "")
+    today = datetime.now(CAMPUS_TZ).date().isoformat()
+    events = [e for e in events if (e.get("date") or "") >= today]
+    events.sort(key=lambda x: (x.get("date") or "", x.get("time") or ""))
 
     for e in events:
         interested_result = (
@@ -598,10 +598,9 @@ async def event_attendees(event_id: str, user: dict = Depends(current_user)):
             continue
 
         score, reasons = compatibility(user, u)
-        shared = list(
-            set(user.get("interests") or [])
-            & set(u.get("interests") or [])
-        )
+        user_interests = {str(x).strip().casefold(): str(x).strip() for x in (user.get("interests") or []) if str(x).strip()}
+        other_interests = {str(x).strip().casefold(): str(x).strip() for x in (u.get("interests") or []) if str(x).strip()}
+        shared = [user_interests.get(k, other_interests[k]) for k in (set(user_interests) & set(other_interests))]
 
         result.append(
             {
@@ -687,7 +686,12 @@ async def create_circle(
             "Only CSUF Verified students can create verified-only Circles",
         )
 
-    members = list({user["id"], *body.member_ids})
+    requested_members = list(dict.fromkeys([user["id"], *body.member_ids]))
+    valid_result = supabase.table("users").select("id,verified").in_("id", requested_members).execute()
+    valid_users = {u["id"]: u for u in (valid_result.data or [])}
+    members = [member_id for member_id in requested_members if member_id in valid_users]
+    if body.verified_only and any(not valid_users[m].get("verified") for m in members):
+        raise HTTPException(400, "Verified-only Circles can only include verified students")
 
     c = {
         "id": str(uuid.uuid4()),
