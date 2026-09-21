@@ -58,7 +58,8 @@ export default function EventDetail() {
           <Image source={{ uri: event.cover_image_url }} style={styles.hero} contentFit="cover" />
           <LinearGradient colors={["rgba(0,0,0,0.4)", "transparent", "rgba(9,9,11,0.9)"]} style={StyleSheet.absoluteFill} />
           <SafeAreaView edges={["top"]} style={styles.heroTop}>
-<Pressable onPress={() => router.replace('/(tabs)/home')} style={styles.back} testID="event-back">              <Icon name="chevron-back" size={22} color="#FFF" />
+<Pressable onPress={() => router.replace("/(tabs)/home")} style={styles.back} testID="event-back">
+              <Icon name="chevron-back" size={22} color="#FFF" />
             </Pressable>
           </SafeAreaView>
           <View style={styles.heroBody}>
