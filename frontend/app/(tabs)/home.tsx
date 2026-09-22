@@ -20,17 +20,19 @@ export default function Home() {
   const [reminders, setReminders] = useState<any[]>([]);
   const [digest, setDigest] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [m, e, c, r, rem, dg] = await Promise.all([
+      const [m, e, c, r, rem, dg, nt] = await Promise.all([
         api.getMatches(),
         api.listEvents(),
         api.listCircles(true),
         api.listRecommendations(),
         api.reminders(),
         api.weekendDigest(),
+        api.notifications(),
       ]);
       setMatches(m.matches || []);
       setEvents(e.events || []);
@@ -38,6 +40,7 @@ export default function Home() {
       setRecs(r.recommendations || []);
       setReminders(rem.reminders || []);
       setDigest(dg);
+      setUnreadCount(nt.unread_count || 0);
     } catch {}
     setRefreshing(false);
   }, []);
@@ -70,7 +73,11 @@ export default function Home() {
           <View style={styles.headerActions}>
             <Pressable onPress={() => router.push("/activity")} style={styles.bellButton} testID="home-activity">
               <Icon name="notifications-outline" size={23} color={colors.onSurface} />
-              <View style={styles.notificationDot} />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+                </View>
+              )}
             </Pressable>
             <Pressable onPress={() => router.push("/(tabs)/profile")}>
               <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={44} />
@@ -212,7 +219,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.xl, paddingBottom: 0 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
-  notificationDot: { position: "absolute", top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error, borderWidth: 2, borderColor: colors.surface },
+  notificationBadge: { position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.error, borderWidth: 2, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  notificationBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", lineHeight: 11 },
   heroSection: { paddingHorizontal: spacing.xl, marginTop: spacing.xl },
   moveCard: { borderRadius: 26, backgroundColor: colors.onSurface, padding: spacing.xl, overflow: "hidden" },
   moveIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", marginBottom: spacing.md },
