@@ -112,7 +112,7 @@ export default function Discover() {
           contentContainerStyle={{ padding: spacing.xl, paddingTop: 0, gap: spacing.md, paddingBottom: 40 }}
           ListEmptyComponent={<EmptyState title="No recommendations yet" />}
           renderItem={({ item: r }) => (
-            <View style={styles.recCard}>
+            <Pressable testID={`recommendation-card-${r.id}`} onPress={() => router.push(`/recommendation/${r.id}`)} style={styles.recCard}>
               <Image source={{ uri: r.image_url }} style={styles.recImg} contentFit="cover" />
               <View style={{ padding: spacing.md }}>
                 <Text style={styles.recCat}>{r.category.toUpperCase()}</Text>
@@ -126,7 +126,7 @@ export default function Discover() {
                   <Text style={{ color: colors.muted, marginLeft: 4, fontSize: 12 }}>{r.saves}</Text>
                 </View>
               </View>
-            </View>
+            </Pressable>
           )}
         />
       )}
