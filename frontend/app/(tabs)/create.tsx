@@ -122,9 +122,29 @@ export default function Create() {
           {mode === "event" && (
             <>
               <Text style={styles.label}>Date</Text>
-              <TextInput value={date} onChangeText={setDate} placeholder="2026-05-30" placeholderTextColor={colors.muted} style={styles.input} testID="create-date" />
+              {Platform.OS === "web" ? (
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.currentTarget.value)}
+                  data-testid="create-date"
+                  style={webPickerStyle}
+                />
+              ) : (
+                <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" placeholderTextColor={colors.muted} style={styles.input} testID="create-date" />
+              )}
               <Text style={styles.label}>Time</Text>
-              <TextInput value={time} onChangeText={setTime} placeholder="7:00 PM" placeholderTextColor={colors.muted} style={styles.input} testID="create-time" />
+              {Platform.OS === "web" ? (
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.currentTarget.value)}
+                  data-testid="create-time"
+                  style={webPickerStyle}
+                />
+              ) : (
+                <TextInput value={time} onChangeText={setTime} placeholder="7:00 PM" placeholderTextColor={colors.muted} style={styles.input} testID="create-time" />
+              )}
             </>
           )}
           <Text style={styles.label}>Location</Text>
@@ -171,3 +191,15 @@ const styles = StyleSheet.create({
   error: { color: colors.error, fontSize: 13, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   footer: { padding: spacing.xl, borderTopWidth: 1, borderTopColor: colors.divider },
 });
+
+const webPickerStyle: any = {
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: radius.md,
+  padding: "14px 16px",
+  fontSize: 15,
+  background: colors.surfaceSecondary,
+  color: colors.onSurface,
+  border: `1px solid ${colors.border}`,
+  fontFamily: "inherit",
+};
