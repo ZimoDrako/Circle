@@ -24,12 +24,12 @@ export default function Discover() {
     try {
       const [e, u, r, c] = await Promise.all([
         api.listEvents({ q }),
-        api.listUsers(q || undefined),
+        q ? api.listUsers(q) : api.getMatches(),
         api.listRecommendations(q || undefined),
         api.listClubs(),
       ]);
       setEvents(e.events || []);
-      setUsers(u.users || []);
+      setUsers(q ? (u.users || []) : (u.matches || []).map((m: any) => ({ ...m.user, compatibility: m.compatibility })));
       setRecs(r.recommendations || []);
       setClubs(c.clubs || []);
     } catch {}
@@ -99,6 +99,7 @@ export default function Discover() {
               <Text style={styles.personName}>{u.first_name}</Text>
               <Text style={styles.personMeta}>{u.major}</Text>
               <View style={{ height: 6 }} />
+              {!q && typeof u.compatibility === "number" && <CompatibilityBadge score={u.compatibility} />}
               <Text style={styles.personInt} numberOfLines={1}>{(u.interests || []).slice(0, 3).join(" · ")}</Text>
             </Pressable>
           )}
