@@ -63,7 +63,7 @@ export default function CircleChat() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
       <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.surface }}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} testID="circle-back"><Icon name="chevron-back" size={26} color={colors.onSurface} /></Pressable>
+          <Pressable onPress={() => router.replace("/(tabs)/circles")} testID="circle-back"><Icon name="chevron-back" size={26} color={colors.onSurface} /></Pressable>
           <View style={{ flex: 1, marginLeft: spacing.sm }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={styles.title} numberOfLines={1}>{circle.name}</Text>
