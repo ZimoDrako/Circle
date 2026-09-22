@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/ionicons";
 import { colors, spacing, radius } from "@/src/theme";
 import { Avatar, Button, Chip, CompatibilityBadge } from "@/src/ui";
 import { api } from "@/src/api";
+import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function MatchDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -129,6 +130,7 @@ export default function MatchDetail() {
           />
         </View>
       </ScrollView>
+      <MainTabBar />
     </View>
   );
 }
