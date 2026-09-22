@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 import uuid
+from matching_engine import people_preference_allows
 
 def build_social_router(supabase, current_user, public_user, compatibility, campus_tz):
     router = APIRouter()
@@ -95,22 +96,70 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
             return {"status":"waiting","intent":intent,"matches":[],"needed":2-len(candidates)}
 
         ids=[x["user_id"] for x in candidates]
+        intent_by_user={x["user_id"]:x for x in candidates}
         ur=supabase.table("users").select("*").in_("id",ids).execute()
-        scored=[]
+
+        # Accepted connections are symmetric for matching purposes.
+        con=supabase.table("connections").select("from_id,to_id,status").eq("status","accepted").limit(2000).execute()
+        connected=set()
+        for row in (con.data or []):
+            if row.get("from_id")==user["id"]: connected.add(row.get("to_id"))
+            if row.get("to_id")==user["id"]: connected.add(row.get("from_id"))
+
+        blocked_by_me=set(user.get("blocked") or [])
+        eligible=[]
         for other in (ur.data or []):
+            oid=other.get("id")
             if other.get("university")!=user.get("university"): continue
+            if oid in blocked_by_me or user["id"] in set(other.get("blocked") or []): continue
+            is_friend=oid in connected
+            other_pref=(intent_by_user.get(oid) or {}).get("people_preference","Either")
+            if not people_preference_allows(body.people_preference,is_friend): continue
+            if not people_preference_allows(other_pref,is_friend): continue
             score,reasons=compatibility(user,other)
-            scored.append((score,other,reasons))
-        scored.sort(key=lambda x:x[0],reverse=True)
-        chosen=scored[:4]
+            eligible.append((score,other,reasons))
+
+        # Greedy group construction considers pairwise chemistry, not only each
+        # person's score with the requester. This avoids a group of individually
+        # good matches who are poor matches with one another.
+        chosen=[]
+        pool=eligible[:]
+        while pool and len(chosen)<4:
+            ranked=[]
+            for base,other,reasons in pool:
+                pair_scores=[compatibility(other,x[1])[0] for x in chosen]
+                group_score=base if not pair_scores else base*.65+(sum(pair_scores)/len(pair_scores))*.35
+                ranked.append((group_score,base,other,reasons))
+            ranked.sort(key=lambda x:x[0],reverse=True)
+            _,base,other,reasons=ranked[0]
+            chosen.append((base,other,reasons))
+            pool=[x for x in pool if x[1]["id"]!=other["id"]]
+
         if len(chosen)<2:
             return {"status":"waiting","intent":intent,"matches":[],"needed":2-len(chosen)}
 
         members=[user["id"]]+[x[1]["id"] for x in chosen]
+
+        # Atomically claim each waiting intent before creating the Circle. A
+        # concurrent matcher can only claim a row still marked waiting.
+        claimed=[]
+        for uid in members:
+            claim=supabase.table("daily_circle_intents").update({"status":"forming","updated_at":now}).eq("user_id",uid).eq("intent_date",today).eq("status","waiting").execute()
+            if not claim.data:
+                for claimed_id in claimed:
+                    supabase.table("daily_circle_intents").update({"status":"waiting","updated_at":now}).eq("user_id",claimed_id).eq("intent_date",today).eq("status","forming").execute()
+                return {"status":"waiting","intent":intent,"matches":[],"needed":1}
+            claimed.append(uid)
+
         circle={"id":str(uuid.uuid4()),"type":"group","name":f"{body.vibe} · {body.time_preference}","creator_id":user["id"],"member_ids":members,"interests":[body.vibe],"event_id":None,"description":f"Daily Circle for {body.vibe.lower()} — {body.time_preference.lower()}.","verified_only":False,"is_lounge":False,"created_at":now}
-        supabase.table("circles").insert(circle).execute()
-        supabase.table("messages").insert({"id":str(uuid.uuid4()),"circle_id":circle["id"],"sender_id":"system","content":f"Your Daily Circle is ready. You all picked {body.vibe} for {body.time_preference.lower()}.","system":True,"created_at":now}).execute()
-        supabase.table("daily_circle_intents").update({"status":"matched","circle_id":circle["id"],"updated_at":now}).in_("user_id",members).eq("intent_date",today).execute()
+        try:
+            supabase.table("circles").insert(circle).execute()
+            supabase.table("messages").insert({"id":str(uuid.uuid4()),"circle_id":circle["id"],"sender_id":"system","content":f"Your Daily Circle is ready. You all picked {body.vibe} for {body.time_preference.lower()}.","system":True,"created_at":now}).execute()
+            supabase.table("daily_circle_intents").update({"status":"matched","circle_id":circle["id"],"updated_at":now}).in_("user_id",members).eq("intent_date",today).eq("status","forming").execute()
+        except Exception:
+            for claimed_id in claimed:
+                supabase.table("daily_circle_intents").update({"status":"waiting","circle_id":None,"updated_at":now}).eq("user_id",claimed_id).eq("intent_date",today).eq("status","forming").execute()
+            raise
         for uid in members:
             if uid!=user["id"]: notify(uid,"daily_circle","Your Circle is ready",f"{body.vibe} · {body.time_preference}",user["id"],"circle",circle["id"])
         return {"status":"matched","intent":intent,"circle":circle,"matches":[{"user":public_user(o),"compatibility":s,"reasons":r} for s,o,r in chosen]}
