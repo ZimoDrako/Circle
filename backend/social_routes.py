@@ -1,7 +1,7 @@
 """Activity, invitations, and Daily Circle routes for Circle."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 from matching_engine import people_preference_allows
 
@@ -75,6 +75,9 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
     @router.post("/daily-circle")
     async def daily_match(body: DailyIntentBody,user: dict = Depends(current_user)):
         today=datetime.now(campus_tz).date().isoformat()
+        # Recover abandoned claims if a server process died while forming a group.
+        stale=(datetime.now(timezone.utc)-timedelta(minutes=5)).isoformat()
+        supabase.table("daily_circle_intents").update({"status":"waiting","circle_id":None}).eq("intent_date",today).eq("status","forming").lt("updated_at",stale).execute()
         old=supabase.table("daily_circle_intents").select("*").eq("user_id",user["id"]).eq("intent_date",today).order("created_at",desc=True).limit(1).execute()
         now=datetime.now(timezone.utc).isoformat()
         if old.data and old.data[0].get("status")=="matched" and old.data[0].get("circle_id"):
