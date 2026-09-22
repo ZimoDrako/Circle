@@ -76,6 +76,7 @@ export const api = {
     req(`/circles/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
 
   listRecommendations: (q?: string) => req(`/recommendations${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  getRecommendation: (id: string) => req(`/recommendations/${id}`),
 
   // Connections (1:1)
   requestConnection: (userId: string) => req(`/connections/${userId}`, { method: "POST" }),
