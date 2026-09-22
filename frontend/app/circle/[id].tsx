@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/ionicons";
 import { colors, spacing, radius } from "@/src/theme";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
+import { MainTabBar } from "@/src/components/main-tab-bar";
 import { useAuth } from "@/src/auth";
 
 export default function CircleChat() {
@@ -153,6 +154,7 @@ export default function CircleChat() {
           </Pressable>
         </SafeAreaView>
       )}
+      <MainTabBar />
     </KeyboardAvoidingView>
   );
 }
