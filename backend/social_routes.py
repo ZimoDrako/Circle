@@ -76,18 +76,23 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
         today=datetime.now(campus_tz).date().isoformat()
         old=supabase.table("daily_circle_intents").select("*").eq("user_id",user["id"]).eq("intent_date",today).order("created_at",desc=True).limit(1).execute()
         now=datetime.now(timezone.utc).isoformat()
+        if old.data and old.data[0].get("status")=="matched" and old.data[0].get("circle_id"):
+            intent=old.data[0]
+            cr=supabase.table("circles").select("*").eq("id",intent["circle_id"]).limit(1).execute()
+            if cr.data:
+                return {"status":"matched","intent":intent,"circle":cr.data[0],"matches":[]}
         if old.data:
             intent=old.data[0]
-            supabase.table("daily_circle_intents").update({"vibe":body.vibe,"time_preference":body.time_preference,"people_preference":body.people_preference,"status":"waiting","updated_at":now}).eq("id",intent["id"]).execute()
-            intent.update({"vibe":body.vibe,"time_preference":body.time_preference,"people_preference":body.people_preference,"status":"waiting","updated_at":now})
+            supabase.table("daily_circle_intents").update({"vibe":body.vibe,"time_preference":body.time_preference,"people_preference":body.people_preference,"status":"waiting","circle_id":None,"updated_at":now}).eq("id",intent["id"]).execute()
+            intent.update({"vibe":body.vibe,"time_preference":body.time_preference,"people_preference":body.people_preference,"status":"waiting","circle_id":None,"updated_at":now})
         else:
             intent={"id":str(uuid.uuid4()),"user_id":user["id"],"vibe":body.vibe,"time_preference":body.time_preference,"people_preference":body.people_preference,"status":"waiting","circle_id":None,"intent_date":today,"created_at":now,"updated_at":now}
             supabase.table("daily_circle_intents").insert(intent).execute()
 
         qr=supabase.table("daily_circle_intents").select("*").eq("intent_date",today).eq("status","waiting").eq("vibe",body.vibe).eq("time_preference",body.time_preference).neq("user_id",user["id"]).limit(30).execute()
         candidates=qr.data or []
-        if not candidates:
-            return {"status":"waiting","intent":intent,"matches":[]}
+        if len(candidates)<2:
+            return {"status":"waiting","intent":intent,"matches":[],"needed":2-len(candidates)}
 
         ids=[x["user_id"] for x in candidates]
         ur=supabase.table("users").select("*").in_("id",ids).execute()
@@ -98,8 +103,8 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
             scored.append((score,other,reasons))
         scored.sort(key=lambda x:x[0],reverse=True)
         chosen=scored[:4]
-        if not chosen:
-            return {"status":"waiting","intent":intent,"matches":[]}
+        if len(chosen)<2:
+            return {"status":"waiting","intent":intent,"matches":[],"needed":2-len(chosen)}
 
         members=[user["id"]]+[x[1]["id"] for x in chosen]
         circle={"id":str(uuid.uuid4()),"type":"group","name":f"{body.vibe} · {body.time_preference}","creator_id":user["id"],"member_ids":members,"interests":[body.vibe],"event_id":None,"description":f"Daily Circle for {body.vibe.lower()} — {body.time_preference.lower()}.","verified_only":False,"is_lounge":False,"created_at":now}
