@@ -140,14 +140,18 @@ export default function Discover() {
           contentContainerStyle={{ padding: spacing.xl, paddingTop: 0, gap: spacing.md, paddingBottom: 40 }}
           ListEmptyComponent={<EmptyState title="No clubs" />}
           renderItem={({ item: c }) => (
-            <View style={styles.clubCard}>
+            <Pressable
+              testID={`club-card-${c.id}`}
+              onPress={() => router.push(`/club/${c.id}`)}
+              style={styles.clubCard}
+            >
               <Image source={{ uri: c.image_url }} style={styles.clubImg} contentFit="cover" />
               <View style={{ padding: spacing.md }}>
                 <Text style={styles.clubName} numberOfLines={1}>{c.name}</Text>
                 <Text style={styles.clubMeta} numberOfLines={2}>{c.description}</Text>
                 <Text style={styles.clubCount}>{c.member_ids?.length || 0} members</Text>
               </View>
-            </View>
+            </Pressable>
           )}
         />
       )}
