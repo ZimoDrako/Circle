@@ -38,14 +38,21 @@ export default function EventDetail() {
 
   const createCircle = async () => {
     if (!event || selected.size === 0) return;
+    setCircleName((v) => v || `${event.title} crew`);
+    setNamePromptOpen(true);
+  };
+
+  const confirmCreateCircle = async () => {
+    if (!event || selected.size === 0 || !circleName.trim()) return;
     setCreatingCircle(true);
     try {
       const r = await api.createCircle({
-        name: `${event.title} group`,
+        name: circleName.trim(),
         interests: event.tags || [],
         member_ids: [...selected],
         event_id: event.id,
       });
+      setNamePromptOpen(false);
       router.push(`/circle/${r.circle.id}`);
     } finally {
       setCreatingCircle(false);
