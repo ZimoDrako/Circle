@@ -84,6 +84,16 @@ export const api = {
   acceptConnection: (id: string) => req(`/connections/${id}/accept`, { method: "POST" }),
   declineConnection: (id: string) => req(`/connections/${id}/decline`, { method: "POST" }),
 
+  // Activity + Daily Circles
+  notifications: () => req("/notifications"),
+  readAllNotifications: () => req("/notifications/read-all", { method: "POST" }),
+  readNotification: (id: string) => req(`/notifications/${id}/read`, { method: "POST" }),
+  dailyCircle: () => req("/daily-circle"),
+  findDailyCircle: (body: { vibe: string; time_preference: string; people_preference: string }) =>
+    req("/daily-circle", { method: "POST", body: JSON.stringify(body) }),
+  inviteToEvent: (eventId: string, recipientIds: string[]) =>
+    req(`/events/${eventId}/invite`, { method: "POST", body: JSON.stringify({ recipient_ids: recipientIds }) }),
+
   // Weekend digest + reminders
   weekendDigest: () => req("/digest/weekend"),
   reminders: () => req("/reminders"),
