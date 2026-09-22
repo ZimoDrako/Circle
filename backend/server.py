@@ -1094,6 +1094,23 @@ async def connection_state(me: str, other: str) -> dict:
     }
 
 
+def _create_notification(user_id: str, kind: str, title: str, body: str = "", actor_id: Optional[str] = None, entity_type: Optional[str] = None, entity_id: Optional[str] = None):
+    notification = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "actor_id": actor_id,
+        "type": kind,
+        "title": title,
+        "body": body,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    supabase.table("notifications").insert(notification).execute()
+    return notification
+
+
 async def _accept_connection(c: dict) -> dict:
     a_result = (
         supabase.table("users")
@@ -1146,6 +1163,17 @@ async def _accept_connection(c: dict) -> dict:
             "accepted_at": datetime.now(timezone.utc).isoformat(),
         }
     ).eq("id", c["id"]).execute()
+
+    if b:
+        _create_notification(
+            c["from_id"],
+            "connection_accepted",
+            f"{b.get('first_name', 'Someone')} accepted your request",
+            "You can now message each other.",
+            b.get("id"),
+            "circle",
+            dm["id"],
+        )
 
     return {
         "status": "connected",
@@ -1225,6 +1253,16 @@ async def request_connection(
     }
 
     supabase.table("connections").insert(c).execute()
+
+    _create_notification(
+        user_id,
+        "connection_request",
+        f"{user.get('first_name', 'Someone')} wants to connect",
+        "Accept the request to start chatting.",
+        user["id"],
+        "connection",
+        c["id"],
+    )
 
     return {
         "connection": {
