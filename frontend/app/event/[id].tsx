@@ -93,6 +93,12 @@ export default function EventDetail() {
             </View>
           </View>
 
+          <Pressable onPress={() => router.push(`/event-invite/${event.id}`)} style={styles.inviteButton} testID="event-invite">
+            <Icon name="person-add-outline" size={18} color={colors.brandPrimary} />
+            <Text style={styles.inviteText}>Invite connections</Text>
+            <Icon name="chevron-forward" size={18} color={colors.muted} />
+          </Pressable>
+
           <View style={styles.rsvpRow}>
             <Button
               label="Going"
@@ -191,6 +197,8 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 20, fontWeight: "800", color: colors.brandPrimary },
   statLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
   rsvpRow: { flexDirection: "row" },
+  inviteButton: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, marginBottom: spacing.md },
+  inviteText: { flex: 1, color: colors.onSurface, fontSize: 14, fontWeight: "700" },
   reminderNote: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md, padding: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandTertiary },
   reminderText: { color: colors.onBrandTertiary, fontSize: 12, fontWeight: "600", flex: 1 },
   sectionTitle: { fontSize: 18, fontWeight: "700", color: colors.onSurface, marginTop: spacing.xl },
