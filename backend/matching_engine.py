@@ -116,8 +116,16 @@ def _interest_score(a: Dict[str, Any], b: Dict[str, Any]) -> Tuple[float, List[s
     av, bv = _interest_vector(a), _interest_vector(b)
     if not av or not bv:
         return 0.0, []
-    direct = sum(min(av[k], bv[k]) for k in av.keys() & bv.keys())
-    denom = max(sum(av.values()), sum(bv.values()), 1.0)
+    shared_keys = av.keys() & bv.keys()
+    direct = sum(min(av[k], bv[k]) for k in shared_keys)
+    # Weighted overlap coefficient: selecting many genuine interests should not
+    # punish a student simply because another profile listed fewer interests.
+    # Blend it with weighted Dice so broad profiles still need meaningful overlap.
+    smaller_mass = max(1.0, min(sum(av.values()), sum(bv.values())))
+    total_mass = max(1.0, sum(av.values()) + sum(bv.values()))
+    overlap = direct / smaller_mass
+    dice = (2.0 * direct) / total_mass
+    direct_score = overlap * .70 + dice * .30
     related = 0.0
     related_pairs = []
     for ai, aw in av.items():
@@ -128,7 +136,7 @@ def _interest_score(a: Dict[str, Any], b: Dict[str, Any]) -> Tuple[float, List[s
                 if val > related:
                     related_pairs = [(ai, bi)]
                 related = max(related, val)
-    score = min(1.0, direct / denom * 1.25 + related * .28)
+    score = min(1.0, direct_score * 1.12 + related * .22)
     shared = sorted(av.keys() & bv.keys(), key=lambda k: min(av[k], bv[k]), reverse=True)[:3]
     reasons = [f"You both like {x.title()}" for x in shared]
     if not reasons and related_pairs:
