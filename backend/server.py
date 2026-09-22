@@ -2009,6 +2009,17 @@ async def health():
     }
 
 
+from social_routes import build_social_router  # noqa: E402
+
+social_api = build_social_router(
+    supabase,
+    current_user,
+    public_user,
+    compatibility,
+    CAMPUS_TZ,
+)
+api.include_router(social_api)
+
 app.include_router(api)
 
 app.add_middleware(
