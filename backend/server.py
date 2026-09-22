@@ -1705,6 +1705,21 @@ async def create_recommendation(
     return {"recommendation": r}
 
 
+@api.get("/recommendations/{recommendation_id}")
+async def get_recommendation(recommendation_id: str):
+    result = (
+        supabase.table("recommendations")
+        .select("*")
+        .eq("id", recommendation_id)
+        .limit(1)
+        .execute()
+    )
+    recommendation = result.data[0] if result.data else None
+    if not recommendation:
+        raise HTTPException(404, "Recommendation not found")
+    return {"recommendation": recommendation}
+
+
 @api.get("/recommendations")
 async def list_recommendations(
     q: Optional[str] = Query(None, max_length=80),
