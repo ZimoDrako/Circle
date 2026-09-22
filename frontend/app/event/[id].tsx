@@ -8,6 +8,7 @@ import Icon from "@react-native-vector-icons/ionicons";
 import { colors, spacing, radius } from "@/src/theme";
 import { Avatar, Button, CompatibilityBadge } from "@/src/ui";
 import { api } from "@/src/api";
+import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function EventDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -159,7 +160,7 @@ export default function EventDetail() {
         </View>
       </ScrollView>
 
-      <SafeAreaView edges={["bottom"]} style={styles.footer}>
+      <SafeAreaView edges={[]} style={styles.footer}>
         <Button
           testID="event-create-circle"
           label={selected.size ? `Create Event Circle (${selected.size})` : "Find People to Go With"}
@@ -168,6 +169,7 @@ export default function EventDetail() {
           disabled={selected.size === 0}
         />
       </SafeAreaView>
+      <MainTabBar />
     </View>
   );
 }
@@ -199,5 +201,5 @@ const styles = StyleSheet.create({
   attMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
   attStatus: { color: colors.brandPrimary, fontSize: 11, fontWeight: "600", marginTop: 2 },
   check: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  footer: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
+  footer: { position: "absolute", left: 0, right: 0, bottom: 57, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
 });
