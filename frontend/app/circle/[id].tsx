@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, KeyboardAvoidingView, Platform, FlatList } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, FlatList, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -16,6 +16,7 @@ export default function CircleChat() {
   const [circle, setCircle] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
+  const [membersOpen, setMembersOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const loadCircle = useCallback(async () => {
@@ -163,7 +164,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider, backgroundColor: colors.surface },
   title: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
   meta: { color: colors.muted, fontSize: 12 },
-  avatarStack: { flexDirection: "row" },
+  avatarStack: { flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingLeft: 4 },
+  moreMembers: { width: 28, height: 28, borderRadius: 14, marginLeft: -8, backgroundColor: colors.surfaceSecondary, borderWidth: 2, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  moreMembersText: { color: colors.onSurface, fontSize: 10, fontWeight: "800" },
   eventPill: { flexDirection: "row", alignItems: "center", padding: spacing.md, backgroundColor: colors.brandTertiary, marginHorizontal: spacing.md, marginTop: spacing.sm, borderRadius: radius.md },
   eventTitle: { color: colors.onBrandTertiary, fontWeight: "700", fontSize: 13 },
   eventMeta: { color: colors.onBrandTertiary, fontSize: 11, marginTop: 2 },
@@ -181,4 +184,10 @@ const styles = StyleSheet.create({
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
   joinBtn: { margin: spacing.md, padding: spacing.md, backgroundColor: colors.brandPrimary, borderRadius: radius.pill, alignItems: "center" },
   joinText: { color: colors.onBrandPrimary, fontWeight: "700" },
+  membersPage: { flex: 1, backgroundColor: colors.surface },
+  membersHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  membersClose: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary },
+  membersTitle: { color: colors.onSurface, fontSize: 18, fontWeight: "800" },
+  memberRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  memberName: { color: colors.onSurface, fontSize: 15, fontWeight: "700" },
 });
