@@ -67,9 +67,31 @@ export default function Home() {
             <Text style={styles.greet}>{greet},</Text>
             <Text style={styles.name}>{user?.first_name} 👋</Text>
           </View>
-          <Pressable onPress={() => router.push("/(tabs)/profile")}>
-            <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={44} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => router.push("/activity")} style={styles.bellButton} testID="home-activity">
+              <Icon name="notifications-outline" size={23} color={colors.onSurface} />
+              <View style={styles.notificationDot} />
+            </Pressable>
+            <Pressable onPress={() => router.push("/(tabs)/profile")}>
+              <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={44} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.heroSection}>
+          <View style={styles.moveCard}>
+            <View style={styles.moveIcon}><Icon name="sparkles" size={20} color={colors.onBrandPrimary} /></View>
+            <Text style={styles.moveKicker}>YOUR DAY, YOUR PEOPLE</Text>
+            <Text style={styles.moveTitle}>What's the move?</Text>
+            <Text style={styles.moveCopy}>Tell Circle what you're up for today. We'll help find people who want the same thing.</Text>
+            <Pressable onPress={() => router.push("/daily-circle")} style={styles.moveButton} testID="whats-the-move">
+              <Text style={styles.moveButtonText}>Find my Circle</Text>
+              <Icon name="arrow-forward" size={17} color={colors.onBrandPrimary} />
+            </Pressable>
+            <View style={styles.moveVibes}>
+              {["Food", "Chill", "Study", "Active", "Explore"].map((v) => <View key={v} style={styles.vibePill}><Text style={styles.vibeText}>{v}</Text></View>)}
+            </View>
+          </View>
         </View>
 
         {reminders.map((r) => (
@@ -169,7 +191,7 @@ export default function Home() {
           <View style={styles.section}>
             <SectionTitle title="Try something new" />
             {recs.slice(0, 3).map((r) => (
-              <Pressable key={r.id} style={styles.recRow}>
+              <Pressable key={r.id} onPress={() => router.push(`/recommendation/${r.id}`)} style={styles.recRow}>
                 <Image source={{ uri: r.image_url }} style={styles.recImg} contentFit="cover" />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={styles.recCat}>{r.category.toUpperCase()}</Text>
@@ -188,6 +210,20 @@ export default function Home() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.xl, paddingBottom: 0 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  notificationDot: { position: "absolute", top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error, borderWidth: 2, borderColor: colors.surface },
+  heroSection: { paddingHorizontal: spacing.xl, marginTop: spacing.xl },
+  moveCard: { borderRadius: 26, backgroundColor: colors.onSurface, padding: spacing.xl, overflow: "hidden" },
+  moveIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", marginBottom: spacing.md },
+  moveKicker: { color: colors.brandSecondary, fontSize: 10, fontWeight: "800", letterSpacing: 1.4 },
+  moveTitle: { color: "#FFFFFF", fontSize: 27, fontWeight: "800", marginTop: 4 },
+  moveCopy: { color: "rgba(255,255,255,0.72)", fontSize: 14, lineHeight: 20, marginTop: spacing.sm, maxWidth: 420 },
+  moveButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.brandPrimary, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 12, marginTop: spacing.lg },
+  moveButtonText: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 14 },
+  moveVibes: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.lg },
+  vibePill: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.09)" },
+  vibeText: { color: "rgba(255,255,255,0.78)", fontSize: 11, fontWeight: "600" },
   greet: { color: colors.muted, fontSize: 14 },
   name: { color: colors.onSurface, fontSize: 24, fontWeight: "800", marginTop: 2 },
   section: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
