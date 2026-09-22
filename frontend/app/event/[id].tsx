@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -16,7 +16,7 @@ export default function EventDetail() {
   const [event, setEvent] = useState<any>(null);
   const [attendees, setAttendees] = useState<any[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [creatingCircle, setCreatingCircle] = useState(false);
+  const [creatingCircle, setCreatingCircle] = useState(false);\n  const [namePromptOpen, setNamePromptOpen] = useState(false);\n  const [circleName, setCircleName] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -164,7 +164,31 @@ export default function EventDetail() {
             })}
           </View>
         </View>
-      </ScrollView>
+      </ScrollView>\n      <Modal visible={namePromptOpen} transparent animationType="fade" onRequestClose={() => setNamePromptOpen(false)}>
+        <View style={styles.nameModalBackdrop}>
+          <View style={styles.nameModalCard}>
+            <Text style={styles.nameModalTitle}>Name your group chat</Text>
+            <Text style={styles.nameModalSub}>This name will show at the top of the Circle chat.</Text>
+            <TextInput
+              autoFocus
+              value={circleName}
+              onChangeText={setCircleName}
+              maxLength={120}
+              placeholder="Group name"
+              placeholderTextColor={colors.muted}
+              style={styles.nameInput}
+              testID="event-circle-name"
+            />
+            <View style={styles.nameActions}>
+              <Pressable onPress={() => setNamePromptOpen(false)} style={styles.nameCancel}><Text style={styles.nameCancelText}>Cancel</Text></Pressable>
+              <Pressable disabled={!circleName.trim() || creatingCircle} onPress={confirmCreateCircle} style={[styles.nameCreate, (!circleName.trim() || creatingCircle) && { opacity: 0.5 }]} testID="event-circle-name-confirm">
+                <Text style={styles.nameCreateText}>{creatingCircle ? "Creating..." : "Create Circle"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
 
       <SafeAreaView edges={[]} style={styles.footer}>
         <Button
@@ -180,7 +204,7 @@ export default function EventDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create({\n  nameModalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: spacing.xl },\n  nameModalCard: { width: "100%", maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, borderWidth: 1, borderColor: colors.border },\n  nameModalTitle: { color: colors.onSurface, fontSize: 20, fontWeight: "800" },\n  nameModalSub: { color: colors.muted, fontSize: 13, marginTop: 4, marginBottom: spacing.lg },\n  nameInput: { backgroundColor: colors.surfaceSecondary, color: colors.onSurface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: 14, fontSize: 16 },\n  nameActions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, marginTop: spacing.lg },\n  nameCancel: { paddingHorizontal: spacing.lg, paddingVertical: 12, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary },\n  nameCancelText: { color: colors.onSurface, fontWeight: "700" },\n  nameCreate: { paddingHorizontal: spacing.lg, paddingVertical: 12, borderRadius: radius.pill, backgroundColor: colors.brandPrimary },\n  nameCreateText: { color: colors.onBrandPrimary, fontWeight: "800" },
   root: { flex: 1, backgroundColor: colors.surface },
   heroWrap: { height: 320, backgroundColor: colors.surfaceTertiary },
   hero: { ...StyleSheet.absoluteFill },
