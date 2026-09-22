@@ -13,6 +13,7 @@ import logging
 import bcrypt
 import jwt
 import re
+import math
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
 from matching_engine import compatibility, build_matching_profile, infer_interests
@@ -170,6 +171,34 @@ class ReportBody(BaseModel):
 # ---------------------------------------------------------------------------
 # Compatibility algorithm
 # ---------------------------------------------------------------------------
+def _record_interest_signals(user: dict, interests: List[str], signal_type: str, weight: float, source_type: str, source_id: str):
+    """Record behavior and refresh low-confidence inferred interests."""
+    now = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for interest in list(dict.fromkeys([str(x).strip() for x in interests if str(x).strip()]))[:20]:
+        rows.append({
+            "id": str(uuid.uuid4()), "user_id": user["id"], "interest": interest,
+            "signal_type": signal_type, "weight": weight,
+            "source_entity_type": source_type, "source_entity_id": source_id, "created_at": now,
+        })
+    if rows:
+        supabase.table("user_interest_signals").insert(rows).execute()
+
+    explicit = user.get("interests") or []
+    inferred = infer_interests(explicit)
+    sr = supabase.table("user_interest_signals").select("interest,weight").eq("user_id", user["id"]).limit(500).execute()
+    totals = {}
+    for row in (sr.data or []):
+        key = str(row.get("interest") or "").strip().casefold()
+        if key:
+            totals[key] = totals.get(key, 0.0) + float(row.get("weight") or 0)
+    explicit_norm = {str(x).strip().casefold() for x in explicit}
+    for key, total in totals.items():
+        if key not in explicit_norm and total > 0:
+            inferred[key] = max(inferred.get(key, 0.0), min(.65, .12 + math.log1p(total) * .16))
+    supabase.table("users").update({"inferred_interests": inferred}).eq("id", user["id"]).execute()
+
+
 # ---------------------------------------------------------------------------
 # Utility: serialize
 # ---------------------------------------------------------------------------
@@ -471,7 +500,7 @@ async def rsvp_event(
 
     event_result = (
         supabase.table("events")
-        .select("id")
+        .select("*")
         .eq("id", event_id)
         .limit(1)
         .execute()
@@ -496,6 +525,11 @@ async def rsvp_event(
             },
             on_conflict="event_id,user_id",
         ).execute()
+
+    event = event_result.data[0]
+    signal_interests = [event.get("category"), *(event.get("tags") or [])]
+    signal_weight = {"going": .8, "interested": .45, "none": -.35}[status]
+    _record_interest_signals(user, signal_interests, f"event_{status}", signal_weight, "event", event_id)
 
     return {"ok": True, "status": status}
 
@@ -1099,6 +1133,14 @@ async def _accept_connection(c: dict) -> dict:
             "accepted_at": datetime.now(timezone.utc).isoformat(),
         }
     ).eq("id", c["id"]).execute()
+
+    if a and b:
+        pair_score, _ = compatibility(a, b)
+        feedback_now = datetime.now(timezone.utc).isoformat()
+        supabase.table("match_feedback").insert([
+            {"id": str(uuid.uuid4()), "user_id": a["id"], "other_user_id": b["id"], "circle_id": dm["id"], "outcome": "connected", "score": pair_score, "created_at": feedback_now},
+            {"id": str(uuid.uuid4()), "user_id": b["id"], "other_user_id": a["id"], "circle_id": dm["id"], "outcome": "connected", "score": pair_score, "created_at": feedback_now},
+        ]).execute()
 
     if b:
         _create_notification(
