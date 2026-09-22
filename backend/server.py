@@ -15,6 +15,7 @@ import jwt
 import re
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
+from matching_engine import compatibility, build_matching_profile, infer_interests
 
 ROOT_DIR = Path(__file__).parent
 CAMPUS_TZ = ZoneInfo("America/Los_Angeles")
@@ -113,6 +114,7 @@ class LoginBody(BaseModel):
 class OnboardingBody(BaseModel):
     looking_for: List[str] = []
     interests: List[str] = []
+    interest_levels: dict = {}
     social_style: dict = {}  # question_id -> answer
     personality: dict = {}  # trait -> 0..100 slider
     year: Optional[str] = None
@@ -122,6 +124,7 @@ class OnboardingBody(BaseModel):
     availability_times: List[str] = []
     profile_photo_url: Optional[str] = None
     bio: Optional[str] = None
+    onboarding_version: int = 2
 
 
 class EventCreateBody(BaseModel):
@@ -167,83 +170,6 @@ class ReportBody(BaseModel):
 # ---------------------------------------------------------------------------
 # Compatibility algorithm
 # ---------------------------------------------------------------------------
-def compatibility(a: dict, b: dict) -> tuple[int, List[str]]:
-    reasons: List[str] = []
-
-    a_interest_map = {str(x).strip().casefold(): str(x).strip() for x in (a.get("interests") or []) if str(x).strip()}
-    b_interest_map = {str(x).strip().casefold(): str(x).strip() for x in (b.get("interests") or []) if str(x).strip()}
-    a_int = set(a_interest_map)
-    b_int = set(b_interest_map)
-    shared = a_int & b_int
-    interest_score = 0
-    if a_int and b_int:
-        interest_score = len(shared) / max(len(a_int | b_int), 1)
-    for i in list(shared)[:3]:
-        reasons.append(f"You both like {a_interest_map.get(i, b_interest_map.get(i, i))}")
-
-    # social style match: same answer per question
-    a_ss = a.get("social_style") or {}
-    b_ss = b.get("social_style") or {}
-    keys = set(a_ss.keys()) & set(b_ss.keys())
-    ss_matches = sum(1 for k in keys if a_ss[k] == b_ss[k])
-    social_score = (ss_matches / len(keys)) if keys else 0
-    if ss_matches >= 2:
-        reasons.append("Similar social style")
-
-    # personality proximity (0..100 sliders)
-    a_p = a.get("personality") or {}
-    b_p = b.get("personality") or {}
-    pkeys = set(a_p.keys()) & set(b_p.keys())
-    if pkeys:
-        diffs = [abs(a_p[k] - b_p[k]) for k in pkeys]
-        personality_score = 1 - (sum(diffs) / (len(diffs) * 100))
-    else:
-        personality_score = 0
-
-    # looking for overlap
-    a_lf = {str(x).strip().casefold() for x in (a.get("looking_for") or []) if str(x).strip()}
-    b_lf = {str(x).strip().casefold() for x in (b.get("looking_for") or []) if str(x).strip()}
-    lf_shared = a_lf & b_lf
-    lf_score = (len(lf_shared) / max(len(a_lf | b_lf), 1)) if (a_lf and b_lf) else 0
-    if lf_shared:
-        reasons.append(f"Both looking for {list(lf_shared)[0]}")
-
-    # availability
-    a_days = set(a.get("availability_days") or [])
-    b_days = set(b.get("availability_days") or [])
-    a_times = set(a.get("availability_times") or [])
-    b_times = set(b.get("availability_times") or [])
-    day_shared = a_days & b_days
-    time_shared = a_times & b_times
-    avail_score = 0
-    if a_days and b_days:
-        avail_score += 0.5 * (len(day_shared) / max(len(a_days | b_days), 1))
-    if a_times and b_times:
-        avail_score += 0.5 * (len(time_shared) / max(len(a_times | b_times), 1))
-    if day_shared and time_shared:
-        reasons.append(f"Both available {list(time_shared)[0].lower()}")
-
-    # campus
-    campus_score = 0
-    if a.get("university") == b.get("university"):
-        campus_score += 0.5
-    if a.get("year") and a.get("year") == b.get("year"):
-        campus_score += 0.5
-
-    total = (
-        interest_score * 30
-        + social_score * 20
-        + personality_score * 15
-        + lf_score * 15
-        + avail_score * 10
-        + campus_score * 10
-    )
-    total = int(round(min(100, max(0, total))))
-    if not reasons:
-        reasons.append("You're both on CSUF campus")
-    return total, reasons[:5]
-
-
 # ---------------------------------------------------------------------------
 # Utility: serialize
 # ---------------------------------------------------------------------------
@@ -325,6 +251,16 @@ async def verify_student(user: dict = Depends(current_user)):
 @api.post("/onboarding")
 async def save_onboarding(body: OnboardingBody, user: dict = Depends(current_user)):
     update = {k: v for k, v in body.model_dump().items() if v is not None}
+    # Explicit choices remain authoritative; inferred interests are lower-confidence
+    # candidates used for exploration and are never shown as facts about a student.
+    update["interest_levels"] = {
+        str(x).strip(): float(update.get("interest_levels", {}).get(str(x).strip(), 1.0))
+        for x in update.get("interests", [])
+        if str(x).strip()
+    }
+    update["inferred_interests"] = infer_interests(update.get("interests", []))
+    update["matching_profile"] = build_matching_profile(update)
+    update["onboarding_version"] = 2
     update["onboarded"] = True
     supabase.table("users").update(update).eq("id", user["id"]).execute()
     result = supabase.table("users").select("*").eq("id", user["id"]).limit(1).execute()
