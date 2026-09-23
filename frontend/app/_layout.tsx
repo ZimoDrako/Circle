@@ -21,7 +21,20 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <StatusBar style="dark" />
-                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#FFFFFF" } }} />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: "#FFFFFF" },
+                    animation: "fade_from_bottom",
+                    animationDuration: 180,
+                    gestureEnabled: true,
+                    fullScreenGestureEnabled: true,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
+                  <Stack.Screen name="circle/[id]" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="daily-circle" options={{ animation: "slide_from_bottom" }} />
+                </Stack>
               </AuthProvider>
             </KeyboardProvider>
           </QueryClientProvider>
