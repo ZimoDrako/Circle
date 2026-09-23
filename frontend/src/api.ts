@@ -89,6 +89,7 @@ export const api = {
   readAllNotifications: () => req("/notifications/read-all", { method: "POST" }),
   readNotification: (id: string) => req(`/notifications/${id}/read`, { method: "POST" }),
   dailyCircle: () => req("/daily-circle"),
+  keepDailyCircle: (id: string) => req(`/circles/${id}/keep`, { method: "POST" }),
   findDailyCircle: (body: { vibe: string; time_preference: string; people_preference: string }) =>
     req("/daily-circle", { method: "POST", body: JSON.stringify(body) }),
   inviteToEvent: (eventId: string, recipientIds: string[]) =>
