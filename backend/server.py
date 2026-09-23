@@ -825,6 +825,21 @@ async def get_circle(
     ):
         raise HTTPException(404, "Not found")
 
+    # Daily Circles that were not kept become read-only after 24 hours.
+    if c.get("type") == "daily" and c.get("daily_status") == "active" and c.get("expires_at"):
+        try:
+            expires_at = datetime.fromisoformat(c["expires_at"].replace("Z", "+00:00"))
+            if expires_at <= datetime.now(timezone.utc):
+                expired_at = datetime.now(timezone.utc).isoformat()
+                supabase.table("circles").update({
+                    "daily_status": "expired",
+                    "matching_open": False,
+                    "archived_at": expired_at,
+                }).eq("id", circle_id).execute()
+                c.update({"daily_status": "expired", "matching_open": False, "archived_at": expired_at})
+        except (TypeError, ValueError):
+            pass
+
     await decorate_circle(c, user)
 
     if c.get("event_id"):
@@ -1006,6 +1021,22 @@ async def send_message(
 
     if c.get("verified_only") and not user.get("verified"):
         raise HTTPException(403, "CSUF Verified students only")
+
+    if c.get("type") == "daily" and c.get("daily_status") != "kept":
+        expired = c.get("daily_status") == "expired"
+        if not expired and c.get("expires_at"):
+            try:
+                expired = datetime.fromisoformat(c["expires_at"].replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+            except (TypeError, ValueError):
+                expired = False
+        if expired:
+            expired_at = datetime.now(timezone.utc).isoformat()
+            supabase.table("circles").update({
+                "daily_status": "expired",
+                "matching_open": False,
+                "archived_at": expired_at,
+            }).eq("id", circle_id).execute()
+            raise HTTPException(403, "This Daily Circle has ended and is read-only")
 
     msg = {
         "id": str(uuid.uuid4()),
