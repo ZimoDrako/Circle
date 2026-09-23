@@ -16,6 +16,9 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
     class InviteBody(BaseModel):
         recipient_ids: list[str] = []
 
+    class CircleFeedbackBody(BaseModel):
+        outcome: str = Field(min_length=1, max_length=30)
+
     def notify(user_id, kind, title, body="", actor_id=None, entity_type=None, entity_id=None):
         n={"id":str(uuid.uuid4()),"user_id":user_id,"actor_id":actor_id,"type":kind,"title":title,"body":body,"entity_type":entity_type,"entity_id":entity_id,"read":False,"created_at":datetime.now(timezone.utc).isoformat()}
         supabase.table("notifications").insert(n).execute()
@@ -85,6 +88,34 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
         if oid in set(requester.get("blocked") or []) or requester["id"] in set(other.get("blocked") or []): return False
         is_friend=oid in connected
         return people_preference_allows(requester_pref,is_friend) and people_preference_allows(other_pref,is_friend)
+
+    @router.get("/circles/{circle_id}/feedback")
+    async def get_circle_feedback(circle_id: str, user: dict = Depends(current_user)):
+        circle=load_daily_circle(circle_id)
+        if not circle: raise HTTPException(404,"Circle not found")
+        if circle.get("type")!="daily": raise HTTPException(400,"Feedback is for Daily Circles")
+        if user["id"] not in (circle.get("member_ids") or []): raise HTTPException(403,"Not a Circle member")
+        rr=supabase.table("match_feedback").select("*").eq("circle_id",circle_id).eq("user_id",user["id"]).is_("other_user_id","null").order("created_at",desc=True).limit(1).execute()
+        return {"feedback":rr.data[0] if rr.data else None}
+
+    @router.post("/circles/{circle_id}/feedback")
+    async def save_circle_feedback(circle_id: str, body: CircleFeedbackBody, user: dict = Depends(current_user)):
+        circle=load_daily_circle(circle_id)
+        if not circle: raise HTTPException(404,"Circle not found")
+        if circle.get("type")!="daily": raise HTTPException(400,"Feedback is for Daily Circles")
+        if user["id"] not in (circle.get("member_ids") or []): raise HTTPException(403,"Not a Circle member")
+        if circle.get("daily_status") not in ("expired","kept"): raise HTTPException(400,"Feedback opens after the Daily Circle ends or is kept")
+        scores={"great":1.0,"okay":0.5,"not_for_me":0.0}
+        if body.outcome not in scores: raise HTTPException(400,"Invalid feedback")
+        now=datetime.now(timezone.utc).isoformat()
+        existing=supabase.table("match_feedback").select("id").eq("circle_id",circle_id).eq("user_id",user["id"]).is_("other_user_id","null").limit(1).execute()
+        row={"user_id":user["id"],"other_user_id":None,"circle_id":circle_id,"outcome":body.outcome,"score":scores[body.outcome]}
+        if existing.data:
+            saved=supabase.table("match_feedback").update(row).eq("id",existing.data[0]["id"]).execute()
+        else:
+            row.update({"id":str(uuid.uuid4()),"created_at":now})
+            saved=supabase.table("match_feedback").insert(row).execute()
+        return {"feedback":(saved.data or [row])[0]}
 
     @router.post("/circles/{circle_id}/keep")
     async def keep_daily_circle(circle_id: str, user: dict = Depends(current_user)):
