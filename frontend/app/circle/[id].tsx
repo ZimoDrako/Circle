@@ -180,7 +180,15 @@ export default function CircleChat() {
         }}
       />
 
-      {circle.is_member ? (
+      {circle.is_member && circle.type === "daily" && circle.daily_status === "expired" ? (
+        <SafeAreaView edges={["bottom"]} style={styles.endedWrap}>
+          <Icon name="time-outline" size={18} color={colors.muted} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.endedTitle}>This Daily Circle has ended</Text>
+            <Text style={styles.endedMeta}>You can still view the chat and member profiles, but new messages are turned off.</Text>
+          </View>
+        </SafeAreaView>
+      ) : circle.is_member ? (
         <SafeAreaView edges={["bottom"]} style={styles.inputWrap}>
           <View style={styles.inputRow}>
             <TextInput
@@ -264,6 +272,9 @@ const styles = StyleSheet.create({
   bubbleOther: { backgroundColor: colors.surfaceSecondary, borderBottomLeftRadius: 4 },
   bubbleSender: { color: colors.brandPrimary, fontWeight: "700", fontSize: 11, marginBottom: 2 },
   bubbleText: { color: colors.onSurface, fontSize: 14 },
+  endedWrap: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surfaceSecondary, borderTopWidth: 1, borderTopColor: colors.divider },
+  endedTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "800" },
+  endedMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
   inputWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
   inputRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, gap: spacing.sm },
   input: { flex: 1, backgroundColor: colors.surfaceSecondary, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 12, fontSize: 14, color: colors.onSurface, borderWidth: 1, borderColor: colors.border },
