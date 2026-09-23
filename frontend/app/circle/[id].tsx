@@ -232,4 +232,5 @@ const styles = StyleSheet.create({
   membersTitle: { color: colors.onSurface, fontSize: 18, fontWeight: "800" },
   memberRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   memberName: { color: colors.onSurface, fontSize: 15, fontWeight: "700" },
+  memberMeta: { color: colors.muted, fontSize: 13, marginTop: 2 },
 });
