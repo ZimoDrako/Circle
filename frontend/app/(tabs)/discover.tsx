@@ -19,6 +19,7 @@ export default function Discover() {
   const [users, setUsers] = useState<any[]>([]);
   const [recs, setRecs] = useState<any[]>([]);
   const [clubs, setClubs] = useState<any[]>([]);
+  const [personBusy, setPersonBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -29,13 +30,28 @@ export default function Discover() {
         api.listClubs(),
       ]);
       setEvents(e.events || []);
-      setUsers(q ? (u.users || []) : (u.matches || []).map((m: any) => ({ ...m.user, compatibility: m.compatibility })));
+      setUsers(q ? (u.users || []) : (u.matches || []).map((m: any) => ({ ...m.user, compatibility: m.compatibility, reasons: m.reasons || [], shared_interests: m.shared_interests || [] })));
       setRecs(r.recommendations || []);
       setClubs(c.clubs || []);
     } catch {}
   }, [q]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const ratePerson = async (userId: string, outcome: "interested" | "not_interested") => {
+    if (personBusy) return;
+    setPersonBusy(userId);
+    try {
+      await api.saveMatchFeedback(userId, outcome);
+      if (outcome === "not_interested") {
+        setUsers((current) => current.filter((u) => u.id !== userId));
+      } else {
+        router.push(`/match/${userId}`);
+      }
+    } finally {
+      setPersonBusy(null);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
@@ -101,6 +117,30 @@ export default function Discover() {
               <View style={{ height: 6 }} />
               {!q && typeof u.compatibility === "number" && <CompatibilityBadge score={u.compatibility} />}
               <Text style={styles.personInt} numberOfLines={1}>{(u.interests || []).slice(0, 3).join(" · ")}</Text>
+              {!q && Array.isArray(u.reasons) && u.reasons.length > 0 && (
+                <Text style={styles.personWhy} numberOfLines={2}>{u.reasons[0]}</Text>
+              )}
+              {!q && (
+                <View style={styles.personActions}>
+                  <Pressable
+                    testID={`person-pass-${u.id}`}
+                    disabled={personBusy === u.id}
+                    onPress={(event) => { event.stopPropagation(); ratePerson(u.id, "not_interested"); }}
+                    style={styles.personPass}
+                  >
+                    <Icon name="close" size={18} color={colors.muted} />
+                  </Pressable>
+                  <Pressable
+                    testID={`person-interested-${u.id}`}
+                    disabled={personBusy === u.id}
+                    onPress={(event) => { event.stopPropagation(); ratePerson(u.id, "interested"); }}
+                    style={styles.personInterested}
+                  >
+                    <Icon name="sparkles" size={15} color={colors.onBrandPrimary} />
+                    <Text style={styles.personInterestedText}>Interested</Text>
+                  </Pressable>
+                </View>
+              )}
             </Pressable>
           )}
         />
@@ -179,6 +219,11 @@ const styles = StyleSheet.create({
   personName: { color: colors.onSurface, fontWeight: "700", fontSize: 15, marginTop: spacing.sm },
   personMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
   personInt: { color: colors.brandPrimary, fontSize: 11, fontWeight: "600" },
+  personWhy: { color: colors.muted, fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6, minHeight: 28 },
+  personActions: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, width: "100%" },
+  personPass: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  personInterested: { flex: 1, minHeight: 36, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: colors.brandPrimary, paddingHorizontal: 8 },
+  personInterestedText: { color: colors.onBrandPrimary, fontSize: 10, fontWeight: "800" },
   recCard: { borderRadius: radius.lg, overflow: "hidden", backgroundColor: colors.surfaceSecondary },
   recImg: { width: "100%", height: 140 },
   recCat: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
