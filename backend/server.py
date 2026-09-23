@@ -448,13 +448,65 @@ async def get_user(user_id: str, user: dict = Depends(current_user)):
     user_interests = {str(x).strip().casefold(): str(x).strip() for x in (user.get("interests") or []) if str(x).strip()}
     other_interests = {str(x).strip().casefold(): str(x).strip() for x in (u.get("interests") or []) if str(x).strip()}
     shared = [user_interests.get(k, other_interests[k]) for k in (set(user_interests) & set(other_interests))]
+    accepted = (
+        supabase.table("connections")
+        .select("id")
+        .eq("status", "accepted")
+        .or_(f"from_id.eq.{user_id},to_id.eq.{user_id}")
+        .limit(500)
+        .execute()
+    )
+    circle_count = (
+        supabase.table("circles")
+        .select("id")
+        .contains("member_ids", [user_id])
+        .neq("type", "dm")
+        .limit(500)
+        .execute()
+    )
     return {
         "user": public_user(u),
         "compatibility": score,
         "reasons": reasons,
         "shared_interests": shared,
+        "connection_count": len(accepted.data or []),
+        "circle_count": len(circle_count.data or []),
         "connection": await connection_state(user["id"], user_id),
     }
+
+
+@api.get("/users/{user_id}/connections")
+async def user_connections(user_id: str, user: dict = Depends(current_user)):
+    target = supabase.table("users").select("id").eq("id", user_id).limit(1).execute()
+    if not target.data:
+        raise HTTPException(404, "User not found")
+    result = (
+        supabase.table("connections")
+        .select("*")
+        .eq("status", "accepted")
+        .or_(f"from_id.eq.{user_id},to_id.eq.{user_id}")
+        .order("accepted_at", desc=True)
+        .limit(500)
+        .execute()
+    )
+    rows = result.data or []
+    other_ids = list({
+        row["to_id"] if row["from_id"] == user_id else row["from_id"]
+        for row in rows
+    })
+    users_result = supabase.table("users").select("*").in_("id", other_ids).limit(500).execute() if other_ids else None
+    user_map = {item["id"]: item for item in ((users_result.data or []) if users_result else [])}
+    connections = []
+    for row in rows:
+        other_id = row["to_id"] if row["from_id"] == user_id else row["from_id"]
+        other = user_map.get(other_id)
+        if other:
+            connections.append({
+                "id": row["id"],
+                "user": public_user(other),
+                "connected_at": row.get("accepted_at") or row.get("created_at"),
+            })
+    return {"connections": connections, "count": len(connections)}
 
 
 @api.get("/users")
