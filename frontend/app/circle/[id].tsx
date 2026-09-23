@@ -166,6 +166,37 @@ export default function CircleChat() {
           </Pressable>
         </SafeAreaView>
       )}
+      <Modal visible={membersOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMembersOpen(false)}>
+        <SafeAreaView style={styles.membersPage}>
+          <View style={styles.membersHeader}>
+            <Pressable onPress={() => setMembersOpen(false)} style={styles.membersClose} testID="circle-members-close">
+              <Icon name="close" size={22} color={colors.onSurface} />
+            </Pressable>
+            <Text style={styles.membersTitle}>Circle members</Text>
+          </View>
+          <FlatList
+            data={circle.members || []}
+            keyExtractor={(m: any) => m.id}
+            contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+            renderItem={({ item: m }: any) => (
+              <Pressable
+                style={styles.memberRow}
+                onPress={() => {
+                  setMembersOpen(false);
+                  router.push(m.id === user?.id ? "/(tabs)/profile" : `/match/${m.id}`);
+                }}
+              >
+                <Avatar uri={m.profile_photo_url} name={m.first_name} size={46} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.memberName}>{m.first_name}{m.id === user?.id ? " (You)" : ""}</Text>
+                  <Text style={styles.memberMeta}>{[m.major, m.year].filter(Boolean).join(" · ") || "Circle member"}</Text>
+                </View>
+                <Icon name="chevron-forward" size={20} color={colors.muted} />
+              </Pressable>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
       <MainTabBar />
     </KeyboardAvoidingView>
   );
