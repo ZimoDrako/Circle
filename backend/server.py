@@ -124,6 +124,7 @@ class OnboardingBody(BaseModel):
     availability_days: List[str] = []
     availability_times: List[str] = []
     profile_photo_url: Optional[str] = None
+    banner_image_url: Optional[str] = None
     bio: Optional[str] = None
     onboarding_version: int = 2
 
@@ -211,6 +212,7 @@ def public_user(u: dict) -> dict:
         "year": u.get("year"),
         "university": u.get("university"),
         "profile_photo_url": u.get("profile_photo_url"),
+        "banner_image_url": u.get("banner_image_url"),
         "bio": u.get("bio"),
         "interests": u.get("interests") or [],
         "looking_for": u.get("looking_for") or [],
