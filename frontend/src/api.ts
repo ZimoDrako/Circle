@@ -49,6 +49,7 @@ export const api = {
   saveMatchFeedback: (userId: string, outcome: "interested" | "not_interested") =>
     req(`/matches/${userId}/feedback?outcome=${outcome}`, { method: "POST" }),
   getUser: (id: string) => req(`/users/${id}`),
+  getUserConnections: (id: string) => req(`/users/${id}/connections`),
   listUsers: (q?: string) => req(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
 
   listEvents: (params: { category?: string; q?: string } = {}) => {
