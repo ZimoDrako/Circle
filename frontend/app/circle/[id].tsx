@@ -17,6 +17,7 @@ export default function CircleChat() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [membersOpen, setMembersOpen] = useState(false);
+  const [keepBusy, setKeepBusy] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const loadCircle = useCallback(async () => {
@@ -57,6 +58,18 @@ export default function CircleChat() {
     await api.joinCircle(id!);
     loadCircle();
     loadMessages();
+  };
+
+  const voteKeep = async () => {
+    if (keepBusy) return;
+    setKeepBusy(true);
+    try {
+      const r = await api.keepDailyCircle(id!);
+      setCircle(r.circle);
+      if (r.kept) loadMessages();
+    } finally {
+      setKeepBusy(false);
+    }
   };
 
   if (!circle) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}><Text style={{ padding: 24, color: colors.muted }}>Loading...</Text></SafeAreaView>;
@@ -110,6 +123,31 @@ export default function CircleChat() {
           <Pressable onPress={() => router.push(`/event/${circle.event.id}`)}>
             <Text style={styles.eventLink}>View</Text>
           </Pressable>
+        </View>
+      )}
+
+      {circle.type === "daily" && circle.daily_status !== "expired" && (
+        <View style={styles.keepCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.keepTitle}>{circle.daily_status === "kept" ? "Circle kept" : "Keep this Circle?"}</Text>
+            <Text style={styles.keepMeta}>
+              {circle.daily_status === "kept"
+                ? "At least 3 members voted yes. This group is permanent."
+                : `${(circle.keep_vote_ids || []).length}/3 members voted yes`}
+            </Text>
+          </View>
+          {circle.daily_status !== "kept" && (
+            <Pressable
+              onPress={voteKeep}
+              disabled={keepBusy || (circle.keep_vote_ids || []).includes(user?.id)}
+              style={[styles.keepBtn, (circle.keep_vote_ids || []).includes(user?.id) && styles.keepBtnDone]}
+              testID="circle-keep-vote"
+            >
+              <Text style={styles.keepBtnText}>
+                {(circle.keep_vote_ids || []).includes(user?.id) ? "Voted" : keepBusy ? "Saving..." : "Yes, keep it"}
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -213,6 +251,12 @@ const styles = StyleSheet.create({
   eventTitle: { color: colors.onBrandTertiary, fontWeight: "700", fontSize: 13 },
   eventMeta: { color: colors.onBrandTertiary, fontSize: 11, marginTop: 2 },
   eventLink: { color: colors.brandPrimary, fontWeight: "700", fontSize: 12 },
+  keepCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginHorizontal: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  keepTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
+  keepMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  keepBtn: { backgroundColor: colors.brandPrimary, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 10 },
+  keepBtnDone: { opacity: 0.55 },
+  keepBtnText: { color: colors.onBrandPrimary, fontSize: 12, fontWeight: "800" },
   systemMsg: { color: colors.muted, fontSize: 12, textAlign: "center", marginVertical: 6 },
   msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
   bubble: { maxWidth: "78%", padding: 10, borderRadius: 16 },
