@@ -10,6 +10,7 @@ type User = {
   year?: string;
   university?: string;
   profile_photo_url?: string | null;
+  banner_image_url?: string | null;
   bio?: string;
   interests: string[];
   looking_for: string[];
