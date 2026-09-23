@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -8,31 +8,26 @@ import { colors, spacing, radius } from "@/src/theme";
 import { Avatar, Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function Profile() {
   const { user, refresh, signOut } = useAuth();
   const router = useRouter();
   const [verifying, setVerifying] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
-  const [loungeId, setLoungeId] = useState<string | null>(null);
-  const [justUnlocked, setJustUnlocked] = useState(false);
-
-  const loadLounge = useCallback(async () => {
-    try {
-      const l = await api.getLounge();
-      setLoungeId(l.locked ? null : l.circle?.id ?? null);
-    } catch {}
-  }, []);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [interestsOpen, setInterestsOpen] = useState(false);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
 
   useFocusEffect(useCallback(() => {
     (async () => {
       try {
-        const r = await api.listCircles(true);
-        setCircleCount((r.circles || []).length);
+        const [circles, conns] = await Promise.all([api.listCircles(true), api.listConnections()]);
+        setCircleCount((circles.circles || []).filter((c: any) => c.type !== "dm").length);
+        setConnections(conns.connected || []);
       } catch {}
     })();
-    loadLounge();
-  }, [loadLounge]));
+  }, []));
 
   if (!user) return null;
 
@@ -49,119 +44,126 @@ export default function Profile() {
 
   const verify = async () => {
     setVerifying(true);
-    try {
-      await api.verifyStudent();
-      await refresh();
-      await loadLounge();
-      setJustUnlocked(true);
-    } finally {
-      setVerifying(false);
-    }
+    try { await api.verifyStudent(); await refresh(); } finally { setVerifying(false); }
   };
 
+  const preview = (user.interests || []).slice(0, 5);
+
   return (
-    <SafeAreaView style={styles.root} edges={["top"]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={styles.top}>
-          <Pressable onPress={changePhoto} testID="profile-photo">
-            <Avatar uri={user.profile_photo_url ?? null} name={user.first_name} size={96} />
-            <View style={styles.cameraBadge}>
-              <Icon name="camera" size={14} color={colors.onBrandPrimary} />
-            </View>
-          </Pressable>
-          <Text style={styles.name}>{user.first_name} {user.last_name}</Text>
-          <Text style={styles.meta}>{user.major || "Add your major"} · {user.year || "—"}</Text>
+    <View style={styles.root}>
+      <SafeAreaView edges={["top"]} style={styles.safeTop}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Profile</Text>
+          <Pressable style={styles.iconButton}><Icon name="settings-outline" size={22} color={colors.onSurface} /></Pressable>
+        </View>
+      </SafeAreaView>
 
-          <View style={styles.verifyRow}>
-            {user.verified ? (
-              <View style={styles.verifiedBadge}>
-                <Icon name="checkmark-circle" size={14} color={colors.onBrandPrimary} />
-                <Text style={styles.verifiedText}>CSUF Verified</Text>
-              </View>
-            ) : (
-              <Pressable onPress={verify} testID="verify-student" style={styles.verifyBtn}>
-                {verifying ? <Text style={styles.verifyText}>Verifying...</Text> : <Text style={styles.verifyText}>Verify student status</Text>}
-              </Pressable>
-            )}
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <View style={styles.heroGlow} />
+          <Pressable onPress={changePhoto} style={styles.avatarWrap} testID="profile-photo">
+            <Avatar uri={user.profile_photo_url ?? null} name={user.first_name} size={104} />
+            <View style={styles.cameraBadge}><Icon name="camera" size={15} color={colors.onBrandPrimary} /></View>
+          </Pressable>
+          <View style={styles.identity}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{user.first_name} {user.last_name}</Text>
+              {user.verified && <Icon name="checkmark-circle" size={20} color={colors.brandPrimary} />}
+            </View>
+            <Text style={styles.meta}>{user.university || "Student"}</Text>
+            <Text style={styles.meta}>{[user.major, user.year].filter(Boolean).join(" · ") || "Complete your profile"}</Text>
+          </View>
+          <Pressable style={styles.editButton}><Text style={styles.editText}>Edit profile</Text></Pressable>
+        </View>
+
+        {!user.verified && (
+          <Pressable onPress={verify} testID="verify-student" style={styles.verifyCard}>
+            <Icon name="shield-checkmark-outline" size={20} color={colors.brandPrimary} />
+            <View style={{ flex: 1 }}><Text style={styles.verifyTitle}>Verify student status</Text><Text style={styles.verifySub}>Unlock verified campus spaces</Text></View>
+            <Text style={styles.verifyAction}>{verifying ? "..." : "Verify"}</Text>
+          </Pressable>
+        )}
+
+        <View style={styles.metrics}>
+          <Pressable style={styles.metric} onPress={() => setConnectionsOpen(true)}>
+            <Text style={styles.metricNum}>{connections.length}</Text><Text style={styles.metricLabel}>Connections</Text>
+          </Pressable>
+          <View style={styles.metricDivider} />
+          <View style={styles.metric}><Text style={styles.metricNum}>{circleCount}</Text><Text style={styles.metricLabel}>Circles</Text></View>
+          <View style={styles.metricDivider} />
+          <Pressable style={styles.metric} onPress={() => setInterestsOpen(true)}>
+            <Text style={styles.metricNum}>{user.interests?.length || 0}</Text><Text style={styles.metricLabel}>Interests</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}><Text style={styles.cardTitle}>About me</Text><Icon name="create-outline" size={18} color={colors.muted} /></View>
+          <Text style={styles.bio}>{user.bio || "Add a short bio so people know what you're into and what kind of people you'd like to meet."}</Text>
+          <View style={styles.detailRow}>
+            {user.year ? <View style={styles.detailPill}><Icon name="school-outline" size={14} color={colors.brandPrimary} /><Text style={styles.detailText}>{user.year}</Text></View> : null}
+            {user.major ? <View style={styles.detailPill}><Icon name="book-outline" size={14} color={colors.brandPrimary} /><Text style={styles.detailText}>{user.major}</Text></View> : null}
           </View>
         </View>
 
-        {user.verified && loungeId && (
-          <Pressable testID="profile-lounge" onPress={() => router.push(`/circle/${loungeId}`)} style={styles.loungeRow}>
-            <View style={styles.loungeIcon}><Icon name="shield-checkmark" size={20} color={colors.onBrandPrimary} /></View>
-            <View style={{ flex: 1, marginLeft: spacing.md }}>
-              <Text style={styles.loungeTitle}>{justUnlocked ? "Verified Lounge unlocked 🎉" : "Verified Lounge"}</Text>
-              <Text style={styles.loungeMeta}>Private chat for CSUF Verified Titans only</Text>
-            </View>
+        <Pressable style={styles.card} onPress={() => setInterestsOpen(true)}>
+          <View style={styles.cardHeader}>
+            <View><Text style={styles.cardTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View>
             <Icon name="chevron-forward" size={20} color={colors.brandPrimary} />
-          </Pressable>
-        )}
+          </View>
+          <View style={styles.chips}>{preview.map((i: string) => <Chip key={i} label={i} selected />)}{(user.interests?.length || 0) > 5 && <View style={styles.more}><Text style={styles.moreText}>+{user.interests.length - 5}</Text></View>}</View>
+        </Pressable>
 
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{user.interests.length}</Text>
-            <Text style={styles.statLabel}>Interests</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{circleCount}</Text>
-            <Text style={styles.statLabel}>Circles</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{user.looking_for.length}</Text>
-            <Text style={styles.statLabel}>Goals</Text>
-          </View>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View>
+          <Text style={styles.bio}>{(user.looking_for || []).join(" · ") || "Add what you're looking for"}</Text>
         </View>
 
-        {user.bio && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.bio}>{user.bio}</Text>
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Interests</Text>
-          <View style={styles.chips}>
-            {user.interests.map((i) => <Chip key={i} label={i} selected />)}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Looking for</Text>
-          <View style={styles.chips}>
-            {user.looking_for.map((i) => <Chip key={i} label={i} />)}
-          </View>
-        </View>
-
-        <View style={{ padding: spacing.xl }}>
-          <Button label="Sign out" variant="secondary" onPress={async () => { await signOut(); router.replace("/(auth)/welcome"); }} testID="profile-signout" />
-        </View>
+        <View style={styles.signout}><Button label="Sign out" variant="secondary" onPress={async () => { await signOut(); router.replace("/(auth)/welcome"); }} testID="profile-signout" /></View>
       </ScrollView>
-    </SafeAreaView>
+
+      <Modal visible={connectionsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setConnectionsOpen(false)}>
+        <SafeAreaView style={styles.modalRoot}>
+          <View style={styles.modalHeader}><Text style={styles.modalTitle}>Connections</Text><Pressable onPress={() => setConnectionsOpen(false)}><Icon name="close" size={26} color={colors.onSurface} /></Pressable></View>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            {connections.length === 0 ? <Text style={styles.empty}>Your accepted connections will appear here.</Text> : connections.map((c: any) => (
+              <Pressable key={c.id} style={styles.personRow} onPress={() => { setConnectionsOpen(false); router.push(`/match/${c.user.id}`); }}>
+                <Avatar uri={c.user.profile_photo_url} name={c.user.first_name} size={48} />
+                <View style={{ flex: 1 }}><Text style={styles.personName}>{c.user.first_name} {c.user.last_name}</Text><Text style={styles.personMeta}>{[c.user.major, c.user.year].filter(Boolean).join(" · ")}</Text></View>
+                <Icon name="chevron-forward" size={18} color={colors.muted} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={interestsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setInterestsOpen(false)}>
+        <SafeAreaView style={styles.modalRoot}>
+          <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View><Pressable onPress={() => setInterestsOpen(false)}><Icon name="close" size={26} color={colors.onSurface} /></Pressable></View>
+          <ScrollView contentContainerStyle={styles.modalContent}><View style={styles.chips}>{(user.interests || []).map((i: string) => <Chip key={i} label={i} selected />)}</View></ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <MainTabBar />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
-  top: { alignItems: "center", padding: spacing.xl },
-  cameraBadge: { position: "absolute", right: 0, bottom: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
-  name: { fontSize: 22, fontWeight: "800", color: colors.onSurface, marginTop: spacing.md },
-  meta: { color: colors.muted, fontSize: 14, marginTop: 2 },
-  verifyRow: { marginTop: spacing.md },
-  verifyBtn: { paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.brandTertiary },
-  verifyText: { color: colors.onBrandTertiary, fontWeight: "600", fontSize: 13 },
-  verifiedBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brandPrimary },
-  verifiedText: { color: colors.onBrandPrimary, fontWeight: "700", fontSize: 12 },
-  statsRow: { flexDirection: "row", padding: spacing.xl, gap: spacing.md },
-  loungeRow: { flexDirection: "row", alignItems: "center", marginHorizontal: spacing.xl, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandTertiary, borderWidth: 1, borderColor: colors.brandPrimary },
-  loungeIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
-  loungeTitle: { color: colors.onBrandTertiary, fontWeight: "700", fontSize: 14 },
-  loungeMeta: { color: colors.onBrandTertiary, fontSize: 12, marginTop: 2, opacity: 0.8 },
-  stat: { flex: 1, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, alignItems: "center" },
-  statNum: { fontSize: 22, fontWeight: "800", color: colors.brandPrimary },
-  statLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  section: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.onSurface, marginBottom: spacing.sm },
-  bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 20 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  root: { flex: 1, backgroundColor: colors.surface }, safeTop: { backgroundColor: colors.surface },
+  header: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.xl },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: colors.onSurface }, iconButton: { padding: 6 },
+  content: { paddingBottom: 32 }, hero: { minHeight: 180, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xl, backgroundColor: colors.surfaceSecondary, overflow: "hidden" },
+  heroGlow: { position: "absolute", width: 180, height: 180, borderRadius: 90, backgroundColor: colors.brandTertiary, right: -45, top: -80, opacity: .9 },
+  avatarWrap: { alignSelf: "flex-start" }, cameraBadge: { position: "absolute", right: -2, bottom: 2, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.surfaceSecondary },
+  identity: { marginTop: spacing.md, paddingRight: 115 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 6 }, name: { fontSize: 25, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 13, marginTop: 3 },
+  editButton: { position: "absolute", right: spacing.xl, bottom: spacing.xl, borderWidth: 1.5, borderColor: colors.brandPrimary, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 }, editText: { color: colors.brandPrimary, fontWeight: "800", fontSize: 13 },
+  verifyCard: { margin: spacing.xl, marginBottom: 0, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandTertiary },
+  verifyTitle: { fontWeight: "800", color: colors.onBrandTertiary }, verifySub: { fontSize: 12, color: colors.onBrandTertiary, opacity: .75, marginTop: 2 }, verifyAction: { fontWeight: "800", color: colors.brandPrimary },
+  metrics: { marginHorizontal: spacing.xl, marginTop: spacing.xl, flexDirection: "row", alignItems: "center" }, metric: { flex: 1, alignItems: "center", paddingVertical: 6 }, metricNum: { fontSize: 20, fontWeight: "900", color: colors.onSurface }, metricLabel: { fontSize: 11, color: colors.muted, marginTop: 2 }, metricDivider: { width: 1, height: 30, backgroundColor: colors.border },
+  card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
+  signout: { paddingHorizontal: spacing.xl, marginTop: spacing.xl }, modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 },
+  empty: { color: colors.muted, textAlign: "center", marginTop: spacing.xxxl }, personRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, personName: { color: colors.onSurface, fontSize: 15, fontWeight: "800" }, personMeta: { color: colors.muted, fontSize: 12, marginTop: 3 },
 });
