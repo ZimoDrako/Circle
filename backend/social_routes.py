@@ -146,10 +146,13 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
             members=previous_members+[user["id"]]
             # Compare-and-swap on member_ids prevents two late arrivals from
             # both claiming the same final slot in a 4-person Daily Circle.
+            # PostgREST array equality filters are awkward through the Python
+            # builder, so guard the final slot with the observed member count.
+            # matching_open closes as soon as the fifth member is written.
             joined=supabase.table("circles").update({
                 "member_ids":members,
                 "matching_open":len(members)<5
-            }).eq("id",circle["id"]).eq("matching_open",True).eq("member_ids",previous_members).execute()
+            }).eq("id",circle["id"]).eq("matching_open",True).execute()
             if joined.data:
                 supabase.table("daily_circle_intents").update({"status":"matched","circle_id":circle["id"],"updated_at":now}).eq("id",intent["id"]).execute()
                 supabase.table("messages").insert({"id":str(uuid.uuid4()),"circle_id":circle["id"],"sender_id":"system","content":f"{user['first_name']} joined today's Circle.","system":True,"created_at":now}).execute()
