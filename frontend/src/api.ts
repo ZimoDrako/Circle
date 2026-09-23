@@ -46,6 +46,8 @@ export const api = {
   saveOnboarding: (body: any) => req("/onboarding", { method: "POST", body: JSON.stringify(body) }),
 
   getMatches: () => req("/matches"),
+  saveMatchFeedback: (userId: string, outcome: "interested" | "not_interested") =>
+    req(`/matches/${userId}/feedback?outcome=${outcome}`, { method: "POST" }),
   getUser: (id: string) => req(`/users/${id}`),
   listUsers: (q?: string) => req(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
 
