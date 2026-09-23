@@ -79,13 +79,24 @@ export default function CircleChat() {
                   : `${circle.member_ids.length} members`}
             </Text>
           </View>
-          <View style={styles.avatarStack}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View Circle members"
+            testID="circle-members-button"
+            disabled={circle.type === "dm"}
+            hitSlop={10}
+            onPress={() => circle.type !== "dm" && setMembersOpen(true)}
+            style={styles.avatarStack}
+          >
             {(circle.type === "dm" ? circle.members.filter((m: any) => m.id !== user?.id) : circle.members.slice(0, 3)).map((m: any, i: number) => (
-              <View key={m.id} style={{ marginLeft: i === 0 ? 0 : -10, borderWidth: 2, borderColor: colors.surface, borderRadius: 999 }}>
+              <View key={m.id} pointerEvents="none" style={{ marginLeft: i === 0 ? 0 : -10, borderWidth: 2, borderColor: colors.surface, borderRadius: 999 }}>
                 <Avatar uri={m.profile_photo_url} name={m.first_name} size={28} />
               </View>
             ))}
-          </View>
+            {circle.type !== "dm" && circle.members.length > 3 && (
+              <View pointerEvents="none" style={styles.moreMembers}><Text style={styles.moreMembersText}>+{circle.members.length - 3}</Text></View>
+            )}
+          </Pressable>
         </View>
       </SafeAreaView>
 
