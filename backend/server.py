@@ -329,6 +329,42 @@ async def get_matches(user: dict = Depends(current_user), limit: int = 30):
         if other_id:
             feedback_by_user[other_id] = row
 
+    # Learn only from explicit, non-sensitive interaction history.
+    # Profiles the student marked Interested, connected with, or rated after a Circle
+    # become lightweight examples for future ranking. We do not infer sensitive traits.
+    positive_ids = {
+        other_id for other_id, row in feedback_by_user.items()
+        if row.get("outcome") in ("interested", "connected")
+        and float(row.get("score") or 0) >= 0.5
+    }
+
+    circle_feedback = (
+        supabase.table("match_feedback")
+        .select("circle_id,outcome,score")
+        .eq("user_id", user["id"])
+        .is_("other_user_id", "null")
+        .not_.is_("circle_id", "null")
+        .execute()
+    )
+    positive_circle_ids = [
+        row.get("circle_id") for row in (circle_feedback.data or [])
+        if row.get("outcome") in ("great", "okay") and float(row.get("score") or 0) >= 0.5
+    ]
+    if positive_circle_ids:
+        circle_rows = (
+            supabase.table("circles")
+            .select("member_ids")
+            .in_("id", positive_circle_ids)
+            .execute()
+        )
+        for circle in (circle_rows.data or []):
+            positive_ids.update(
+                member_id for member_id in (circle.get("member_ids") or [])
+                if member_id != user["id"]
+            )
+
+    positive_profiles = [o for o in others if o.get("id") in positive_ids][:20]
+
     scored = []
     for o in others:
         previous_feedback = feedback_by_user.get(o.get("id"))
@@ -336,6 +372,19 @@ async def get_matches(user: dict = Depends(current_user), limit: int = 30):
             continue
 
         score, reasons = compatibility(user, o)
+
+        behavior_boost = 0
+        if positive_profiles and o.get("id") not in positive_ids:
+            affinity_scores = [compatibility(example, o)[0] for example in positive_profiles]
+            if affinity_scores:
+                affinity = sum(sorted(affinity_scores, reverse=True)[:3]) / min(3, len(affinity_scores))
+                # Keep behavioral learning deliberately modest: at most +8 points.
+                # The explicit profile compatibility score remains the primary signal.
+                behavior_boost = max(0, min(8, round((affinity - 55) * 0.32)))
+                if behavior_boost >= 3:
+                    reasons = [*reasons, "Similar to people you've vibed with"][:5]
+
+        score = min(100, score + behavior_boost)
         user_interests = {str(x).strip().casefold(): str(x).strip() for x in (user.get("interests") or []) if str(x).strip()}
         other_interests = {str(x).strip().casefold(): str(x).strip() for x in (o.get("interests") or []) if str(x).strip()}
         shared = [user_interests.get(k, other_interests[k]) for k in (set(user_interests) & set(other_interests))]
