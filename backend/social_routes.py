@@ -86,6 +86,36 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
         is_friend=oid in connected
         return people_preference_allows(requester_pref,is_friend) and people_preference_allows(other_pref,is_friend)
 
+    @router.post("/circles/{circle_id}/keep")
+    async def keep_daily_circle(circle_id: str, user: dict = Depends(current_user)):
+        circle=load_daily_circle(circle_id)
+        if not circle: raise HTTPException(404,"Circle not found")
+        members=list(circle.get("member_ids") or [])
+        if user["id"] not in members: raise HTTPException(403,"Only Circle members can vote")
+        if circle.get("type")!="daily": raise HTTPException(400,"Only Daily Circles can be kept")
+        if circle.get("daily_status")=="expired": raise HTTPException(400,"This Daily Circle has expired")
+        if circle.get("daily_status")=="kept":
+            votes=list(circle.get("keep_vote_ids") or [])
+            return {"kept":True,"votes":len(votes),"needed":0,"circle":circle}
+
+        votes=list(circle.get("keep_vote_ids") or [])
+        if user["id"] not in votes:
+            votes.append(user["id"])
+
+        now=datetime.now(timezone.utc).isoformat()
+        kept=len(votes)>=3
+        changes={"keep_vote_ids":votes}
+        if kept:
+            changes.update({"daily_status":"kept","matching_open":False,"expires_at":None,"kept_at":now,"archived_at":None})
+        updated=supabase.table("circles").update(changes).eq("id",circle_id).execute()
+        circle=(updated.data or [circle])[0]
+
+        if kept:
+            supabase.table("messages").insert({"id":str(uuid.uuid4()),"circle_id":circle_id,"sender_id":"system","content":"3 members voted to keep this Circle. This group is now permanent.","system":True,"created_at":now}).execute()
+            for uid in members:
+                if uid!=user["id"]: notify(uid,"daily_circle_kept","Your Circle is staying","3 members voted to keep the group.",user["id"],"circle",circle_id)
+        return {"kept":kept,"votes":len(votes),"needed":max(0,3-len(votes)),"circle":circle}
+
     @router.get("/daily-circle")
     async def daily_status(user: dict = Depends(current_user)):
         expire_daily_circles()
