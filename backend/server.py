@@ -314,8 +314,27 @@ async def get_matches(user: dict = Depends(current_user), limit: int = 30):
         o for o in result.data
         if o.get("id") != user["id"]
     ]
+
+    # Discovery feedback keeps dismissed people out of the recommendation deck.
+    feedback_result = (
+        supabase.table("match_feedback")
+        .select("other_user_id,outcome,score")
+        .eq("user_id", user["id"])
+        .not_.is_("other_user_id", "null")
+        .execute()
+    )
+    feedback_by_user = {}
+    for row in (feedback_result.data or []):
+        other_id = row.get("other_user_id")
+        if other_id:
+            feedback_by_user[other_id] = row
+
     scored = []
     for o in others:
+        previous_feedback = feedback_by_user.get(o.get("id"))
+        if previous_feedback and previous_feedback.get("outcome") == "not_interested":
+            continue
+
         score, reasons = compatibility(user, o)
         user_interests = {str(x).strip().casefold(): str(x).strip() for x in (user.get("interests") or []) if str(x).strip()}
         other_interests = {str(x).strip().casefold(): str(x).strip() for x in (o.get("interests") or []) if str(x).strip()}
@@ -330,6 +349,44 @@ async def get_matches(user: dict = Depends(current_user), limit: int = 30):
         )
     scored.sort(key=lambda x: x["compatibility"], reverse=True)
     return {"matches": scored[:limit]}
+
+
+@api.post("/matches/{user_id}/feedback")
+async def save_match_feedback(
+    user_id: str,
+    outcome: str = Query(..., pattern="^(interested|not_interested)$"),
+    user: dict = Depends(current_user),
+):
+    if user_id == user["id"]:
+        raise HTTPException(400, "You can't rate yourself")
+
+    target = supabase.table("users").select("id").eq("id", user_id).eq("onboarded", True).limit(1).execute()
+    if not target.data:
+        raise HTTPException(404, "User not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    existing = (
+        supabase.table("match_feedback")
+        .select("id")
+        .eq("user_id", user["id"])
+        .eq("other_user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    score = 1.0 if outcome == "interested" else 0.0
+    row = {
+        "user_id": user["id"],
+        "other_user_id": user_id,
+        "circle_id": None,
+        "outcome": outcome,
+        "score": score,
+    }
+    if existing.data:
+        saved = supabase.table("match_feedback").update(row).eq("id", existing.data[0]["id"]).execute()
+    else:
+        row.update({"id": str(uuid.uuid4()), "created_at": now})
+        saved = supabase.table("match_feedback").insert(row).execute()
+    return {"feedback": (saved.data or [row])[0]}
 
 
 @api.get("/users/{user_id}")
