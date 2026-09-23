@@ -18,6 +18,8 @@ export default function CircleChat() {
   const [input, setInput] = useState("");
   const [membersOpen, setMembersOpen] = useState(false);
   const [keepBusy, setKeepBusy] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const loadCircle = useCallback(async () => {
@@ -37,7 +39,8 @@ export default function CircleChat() {
   useFocusEffect(useCallback(() => {
     loadCircle();
     loadMessages();
-  }, [loadCircle, loadMessages]));
+    api.getCircleFeedback(id!).then((r: any) => setFeedback(r.feedback?.outcome || null)).catch(() => {});
+  }, [id, loadCircle, loadMessages]));
 
   useEffect(() => {
     const t = setInterval(loadMessages, 4000);
@@ -69,6 +72,17 @@ export default function CircleChat() {
       if (r.kept) loadMessages();
     } finally {
       setKeepBusy(false);
+    }
+  };
+
+  const submitFeedback = async (outcome: "great" | "okay" | "not_for_me") => {
+    if (feedbackBusy) return;
+    setFeedbackBusy(true);
+    try {
+      const r = await api.saveCircleFeedback(id!, outcome);
+      setFeedback(r.feedback?.outcome || outcome);
+    } finally {
+      setFeedbackBusy(false);
     }
   };
 
@@ -148,6 +162,31 @@ export default function CircleChat() {
               </Text>
             </Pressable>
           )}
+        </View>
+      )}
+
+      {circle.type === "daily" && ["expired", "kept"].includes(circle.daily_status) && (
+        <View style={styles.feedbackCard}>
+          <Text style={styles.feedbackTitle}>How was this Circle?</Text>
+          <Text style={styles.feedbackMeta}>Your answer helps improve who we match you with next time.</Text>
+          <View style={styles.feedbackRow}>
+            {[
+              { key: "great", label: "Great" },
+              { key: "okay", label: "Okay" },
+              { key: "not_for_me", label: "Not for me" },
+            ].map((option) => (
+              <Pressable
+                key={option.key}
+                disabled={feedbackBusy}
+                onPress={() => submitFeedback(option.key as "great" | "okay" | "not_for_me")}
+                style={[styles.feedbackBtn, feedback === option.key && styles.feedbackBtnSelected]}
+                testID={`circle-feedback-${option.key}`}
+              >
+                <Text style={[styles.feedbackBtnText, feedback === option.key && styles.feedbackBtnTextSelected]}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {feedback && <Text style={styles.feedbackThanks}>Thanks — we'll use this to improve future matches.</Text>}
         </View>
       )}
 
@@ -259,6 +298,15 @@ const styles = StyleSheet.create({
   eventTitle: { color: colors.onBrandTertiary, fontWeight: "700", fontSize: 13 },
   eventMeta: { color: colors.onBrandTertiary, fontSize: 11, marginTop: 2 },
   eventLink: { color: colors.brandPrimary, fontWeight: "700", fontSize: 12 },
+  feedbackCard: { marginHorizontal: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  feedbackTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
+  feedbackMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  feedbackRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  feedbackBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  feedbackBtnSelected: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  feedbackBtnText: { color: colors.onSurface, fontSize: 12, fontWeight: "700" },
+  feedbackBtnTextSelected: { color: colors.onBrandPrimary },
+  feedbackThanks: { color: colors.muted, fontSize: 11, marginTop: spacing.sm },
   keepCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginHorizontal: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   keepTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
   keepMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
