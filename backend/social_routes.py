@@ -142,14 +142,24 @@ def build_social_router(supabase, current_user, public_user, compatibility, camp
             if best is None or group_score>best[0]: best=(group_score,circle,member_users)
         if best:
             _,circle,member_users=best
-            members=list(circle.get("member_ids") or [])+[user["id"]]
-            supabase.table("circles").update({"member_ids":members,"matching_open":len(members)<5}).eq("id",circle["id"]).eq("matching_open",True).execute()
-            supabase.table("daily_circle_intents").update({"status":"matched","circle_id":circle["id"],"updated_at":now}).eq("id",intent["id"]).execute()
-            supabase.table("messages").insert({"id":str(uuid.uuid4()),"circle_id":circle["id"],"sender_id":"system","content":f"{user['first_name']} joined today's Circle.","system":True,"created_at":now}).execute()
-            for uid in members:
-                if uid!=user["id"]: notify(uid,"daily_circle_member","Someone joined your Circle",f"{user['first_name']} joined {body.vibe} · {body.time_preference}",user["id"],"circle",circle["id"])
-            circle.update({"member_ids":members,"matching_open":len(members)<5})
-            return {"status":"matched","joined_existing":True,"intent":intent,"circle":circle,"matches":[{"user":public_user(o),"compatibility":compatibility(user,o)[0]} for o in member_users]}
+            previous_members=list(circle.get("member_ids") or [])
+            members=previous_members+[user["id"]]
+            # Compare-and-swap on member_ids prevents two late arrivals from
+            # both claiming the same final slot in a 4-person Daily Circle.
+            joined=supabase.table("circles").update({
+                "member_ids":members,
+                "matching_open":len(members)<5
+            }).eq("id",circle["id"]).eq("matching_open",True).eq("member_ids",previous_members).execute()
+            if joined.data:
+                supabase.table("daily_circle_intents").update({"status":"matched","circle_id":circle["id"],"updated_at":now}).eq("id",intent["id"]).execute()
+                supabase.table("messages").insert({"id":str(uuid.uuid4()),"circle_id":circle["id"],"sender_id":"system","content":f"{user['first_name']} joined today's Circle.","system":True,"created_at":now}).execute()
+                for uid in members:
+                    if uid!=user["id"]: notify(uid,"daily_circle_member","Someone joined your Circle",f"{user['first_name']} joined {body.vibe} · {body.time_preference}",user["id"],"circle",circle["id"])
+                circle.update({"member_ids":members,"matching_open":len(members)<5})
+                return {"status":"matched","joined_existing":True,"intent":intent,"circle":circle,"matches":[{"user":public_user(o),"compatibility":compatibility(user,o)[0]} for o in member_users]}
+            # The group changed after we scored it (usually another user took
+            # the last slot). Continue into normal matching instead of falsely
+            # marking this intent as matched.
 
         qr=supabase.table("daily_circle_intents").select("*").eq("intent_date",today).eq("status","waiting").eq("vibe",body.vibe).eq("time_preference",body.time_preference).neq("user_id",user["id"]).limit(30).execute()
         candidates=qr.data or []
