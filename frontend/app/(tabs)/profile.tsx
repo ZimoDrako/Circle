@@ -129,13 +129,9 @@ export default function Profile() {
         <View style={styles.card}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>About me</Text><Icon name="create-outline" size={18} color={colors.muted} /></View>
           <Text style={styles.bio}>{user.bio || "Add a short bio so people know what you're into and what kind of people you'd like to meet."}</Text>
-          <View style={styles.detailRow}>
-            {user.year ? <View style={styles.detailPill}><Icon name="school-outline" size={14} color={colors.brandPrimary} /><Text style={styles.detailText}>{user.year}</Text></View> : null}
-            {user.major ? <View style={styles.detailPill}><Icon name="book-outline" size={14} color={colors.brandPrimary} /><Text style={styles.detailText}>{user.major}</Text></View> : null}
-          </View>
         </View>
 
-        <Pressable style={styles.card} onPress={() => setInterestsOpen(true)}>
+        <Pressable style={styles.plainSection} onPress={() => setInterestsOpen(true)}>
           <View style={styles.cardHeader}>
             <View><Text style={styles.cardTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View>
             <Icon name="chevron-forward" size={20} color={colors.brandPrimary} />
@@ -143,9 +139,9 @@ export default function Profile() {
           <View style={styles.previewRow}>{preview.map((i: string) => <View key={i} style={styles.previewTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text></View>)}{(user.interests?.length || 0) > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{user.interests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
         </Pressable>
 
-        <View style={styles.card}>
+        <View style={styles.plainSection}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View>
-          <Text style={styles.bio}>{(user.looking_for || []).join(" · ") || "Add what you're looking for"}</Text>
+          {(user.looking_for || []).length ? <View style={styles.lookingWrap}>{(user.looking_for || []).map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View> : <Text style={styles.bio}>Add what you're looking for</Text>}
         </View>
 
         <View style={styles.signout}><Button label="Sign out" variant="secondary" onPress={async () => { await signOut(); router.replace("/(auth)/welcome"); }} testID="profile-signout" /></View>
@@ -191,8 +187,10 @@ const styles = StyleSheet.create({
   verifyTitle: { fontWeight: "800", color: colors.onBrandTertiary }, verifySub: { fontSize: 12, color: colors.onBrandTertiary, opacity: .75, marginTop: 2 }, verifyAction: { fontWeight: "800", color: colors.brandPrimary },
   metrics: { marginHorizontal: spacing.xl, marginTop: spacing.xl, flexDirection: "row", alignItems: "center" }, metric: { flex: 1, alignItems: "center", paddingVertical: 6 }, metricNum: { fontSize: 20, fontWeight: "900", color: colors.onSurface }, metricLabel: { fontSize: 11, color: colors.muted, marginTop: 2 }, metricDivider: { width: 1, height: 30, backgroundColor: colors.border },
   card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
+  lookingWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: spacing.md }, lookingTag: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill }, lookingTag0: { backgroundColor: "#EAF3FF" }, lookingTag1: { backgroundColor: "#F1EBFF" }, lookingTag2: { backgroundColor: "#FFF1DF" }, lookingTag3: { backgroundColor: "#E9F8F0" }, lookingTag4: { backgroundColor: "#FFECEF" }, lookingText: { color: colors.onSurface, fontSize: 12, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
   previewRow: { flexDirection: "row", justifyContent: "space-between", gap: 3, marginTop: spacing.sm }, previewTile: { flex: 1, minWidth: 0, maxWidth: "20%", alignItems: "center", gap: 5, paddingVertical: 4 }, modalInterestGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }, modalInterestTile: { width: "29%", alignItems: "center", gap: 7, paddingVertical: 8 }, modalInterestName: { color: colors.onSurface, fontSize: 12, fontWeight: "700", textAlign: "center", width: "100%" }, interestEmblem: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, interestName: { color: colors.onSurface, fontSize: 11, fontWeight: "700", maxWidth: 88, textAlign: "center" }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
   signout: { paddingHorizontal: spacing.xl, marginTop: spacing.xl }, modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 },
