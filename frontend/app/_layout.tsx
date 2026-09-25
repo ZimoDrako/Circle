@@ -9,10 +9,12 @@ import { StatusBar } from "expo-status-bar";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { queryClient } from "@/src/query-client";
 import { AuthProvider } from "@/src/auth";
+import { ThemeProvider, useTheme } from "@/src/theme";
 
 LogBox.ignoreAllLogs(true);
 
-export default function RootLayout() {
+function ThemedApp() {
+  const { colors, scheme } = useTheme();
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -20,11 +22,11 @@ export default function RootLayout() {
           <QueryClientProvider client={queryClient}>
             <KeyboardProvider>
               <AuthProvider>
-                <StatusBar style="dark" />
+                <StatusBar style={scheme === "dark" ? "light" : "dark"} />
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: "#FFFFFF" },
+                    contentStyle: { backgroundColor: colors.surface },
                     animation: "fade_from_bottom",
                     animationDuration: 180,
                     gestureEnabled: true,
@@ -42,4 +44,8 @@ export default function RootLayout() {
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
+}
+
+export default function RootLayout() {
+  return <ThemeProvider><ThemedApp /></ThemeProvider>;
 }
