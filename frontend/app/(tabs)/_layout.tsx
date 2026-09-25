@@ -23,12 +23,12 @@ export default function TabsLayout() {
         options={{ title: "Discover", tabBarIcon: ({ color, size }) => <Icon name="compass" size={size} color={color} /> }}
       />
       <Tabs.Screen
-        name="circles"
-        options={{ title: "Circles", tabBarIcon: ({ color, size }) => <Icon name="people" size={size} color={color} /> }}
-      />
-      <Tabs.Screen
         name="create"
         options={{ title: "Create", tabBarIcon: ({ color, size }) => <Icon name="add-circle" size={size + 4} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="circles"
+        options={{ title: "Circles", tabBarIcon: ({ color, size }) => <Icon name="people" size={size} color={color} /> }}
       />
       <Tabs.Screen
         name="profile"
