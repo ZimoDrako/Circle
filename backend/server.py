@@ -152,6 +152,14 @@ class EventCreateBody(BaseModel):
     event_type: str = "student"  # student | official | hangout
 
 
+class ClubCreateBody(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=2000)
+    category: str = Field(min_length=1, max_length=60)
+    tags: List[str] = []
+    image_url: Optional[str] = None
+
+
 class RecommendationCreateBody(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(min_length=1, max_length=2000)
@@ -2213,34 +2221,133 @@ async def list_recommendations(
 # ---------------------------------------------------------------------------
 # Routes: Clubs
 # ---------------------------------------------------------------------------
-@api.get("/clubs")
-async def list_clubs():
-    result = (
-        supabase.table("clubs")
-        .select("*")
-        .limit(200)
-        .execute()
-    )
+def _ensure_club_chat(club: dict) -> dict:
+    chat_id = club.get("chat_circle_id")
+    if chat_id:
+        existing = supabase.table("circles").select("*").eq("id", chat_id).limit(1).execute()
+        if existing.data:
+            return existing.data[0]
 
-    return {"clubs": result.data or []}
+    chat = {
+        "id": str(uuid.uuid4()),
+        "type": "club",
+        "name": f"{club['name']} Chat",
+        "creator_id": club.get("creator_id"),
+        "member_ids": list(club.get("member_ids") or []),
+        "interests": list(club.get("tags") or []),
+        "description": f"Member chat for {club['name']}",
+        "verified_only": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    supabase.table("circles").insert(chat).execute()
+    supabase.table("clubs").update({"chat_circle_id": chat["id"]}).eq("id", club["id"]).execute()
+    club["chat_circle_id"] = chat["id"]
+    return chat
+
+
+@api.post("/clubs")
+async def create_club(body: ClubCreateBody, user: dict = Depends(current_user)):
+    club = {
+        "id": str(uuid.uuid4()),
+        "university": user.get("university"),
+        "name": body.name.strip(),
+        "description": body.description.strip(),
+        "category": body.category,
+        "tags": list(dict.fromkeys(body.tags)),
+        "image_url": body.image_url,
+        "member_ids": [user["id"]],
+        "creator_id": user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    supabase.table("clubs").insert(club).execute()
+    chat = _ensure_club_chat(club)
+    supabase.table("messages").insert(_dm_system_msg(chat["id"], f"{user['first_name']} created {club['name']}")).execute()
+    club["is_member"] = True
+    return {"club": club}
+
+
+@api.get("/clubs")
+async def list_clubs(user: Optional[dict] = Depends(optional_user)):
+    result = supabase.table("clubs").select("*").order("created_at", desc=True).limit(200).execute()
+    clubs = result.data or []
+    if user:
+        for club in clubs:
+            club["is_member"] = user["id"] in (club.get("member_ids") or [])
+    return {"clubs": clubs}
+
+
+@api.get("/users/{user_id}/clubs")
+async def user_clubs(user_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("clubs").select("*").contains("member_ids", [user_id]).order("created_at", desc=True).limit(100).execute()
+    clubs = result.data or []
+    for club in clubs:
+        club["is_member"] = user["id"] in (club.get("member_ids") or [])
+    return {"clubs": clubs}
 
 
 @api.get("/clubs/{club_id}")
-async def get_club(club_id: str):
-    result = (
-        supabase.table("clubs")
-        .select("*")
-        .eq("id", club_id)
-        .limit(1)
-        .execute()
-    )
-
-    c = result.data[0] if result.data else None
-
-    if not c:
+async def get_club(club_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("clubs").select("*").eq("id", club_id).limit(1).execute()
+    club = result.data[0] if result.data else None
+    if not club:
         raise HTTPException(404, "Not found")
+    club["is_member"] = user["id"] in (club.get("member_ids") or [])
+    club["is_creator"] = club.get("creator_id") == user["id"]
+    return {"club": club}
 
-    return {"club": c}
+
+@api.post("/clubs/{club_id}/join")
+async def join_club(club_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("clubs").select("*").eq("id", club_id).limit(1).execute()
+    club = result.data[0] if result.data else None
+    if not club:
+        raise HTTPException(404, "Club not found")
+    members = list(club.get("member_ids") or [])
+    if user["id"] not in members:
+        members.append(user["id"])
+        supabase.table("clubs").update({"member_ids": members}).eq("id", club_id).execute()
+    club["member_ids"] = members
+    chat = _ensure_club_chat(club)
+    chat_members = list(chat.get("member_ids") or [])
+    if user["id"] not in chat_members:
+        chat_members.append(user["id"])
+        supabase.table("circles").update({"member_ids": chat_members}).eq("id", chat["id"]).execute()
+        supabase.table("messages").insert(_dm_system_msg(chat["id"], f"{user['first_name']} joined the club")).execute()
+    return {"ok": True, "chat_circle_id": chat["id"], "member_count": len(members)}
+
+
+@api.post("/clubs/{club_id}/leave")
+async def leave_club(club_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("clubs").select("*").eq("id", club_id).limit(1).execute()
+    club = result.data[0] if result.data else None
+    if not club:
+        raise HTTPException(404, "Club not found")
+    if club.get("creator_id") == user["id"]:
+        raise HTTPException(400, "Club creators cannot leave their own club yet")
+    members = [uid for uid in (club.get("member_ids") or []) if uid != user["id"]]
+    supabase.table("clubs").update({"member_ids": members}).eq("id", club_id).execute()
+    if club.get("chat_circle_id"):
+        cr = supabase.table("circles").select("member_ids").eq("id", club["chat_circle_id"]).limit(1).execute()
+        if cr.data:
+            chat_members = [uid for uid in (cr.data[0].get("member_ids") or []) if uid != user["id"]]
+            supabase.table("circles").update({"member_ids": chat_members}).eq("id", club["chat_circle_id"]).execute()
+    return {"ok": True}
+
+
+@api.post("/clubs/{club_id}/chat")
+async def get_or_create_club_chat(club_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("clubs").select("*").eq("id", club_id).limit(1).execute()
+    club = result.data[0] if result.data else None
+    if not club:
+        raise HTTPException(404, "Club not found")
+    if user["id"] not in (club.get("member_ids") or []):
+        raise HTTPException(403, "Join this club to access its chat")
+    chat = _ensure_club_chat(club)
+    members = list(chat.get("member_ids") or [])
+    if user["id"] not in members:
+        members.append(user["id"])
+        supabase.table("circles").update({"member_ids": members}).eq("id", chat["id"]).execute()
+    return {"circle_id": chat["id"]}
 
 
 # ---------------------------------------------------------------------------
