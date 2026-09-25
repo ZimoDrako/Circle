@@ -17,6 +17,7 @@ export default function Profile() {
   const [connections, setConnections] = useState<any[]>([]);
   const [interestsOpen, setInterestsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState<"about" | "events" | "posts" | "circles">("about");
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -127,6 +128,16 @@ export default function Profile() {
           </Pressable>
         </View>
 
+        <View style={styles.profileTabs}>
+          {([["about","About"],["events","Events"],["posts","Posts"],["circles","Circles"]] as const).map(([key,label]) => (
+            <Pressable key={key} style={styles.profileTab} onPress={() => setProfileTab(key)}>
+              <Text style={[styles.profileTabText, profileTab === key && styles.profileTabTextActive]}>{label}</Text>
+              {profileTab === key && <View style={styles.profileTabLine} />}
+            </Pressable>
+          ))}
+        </View>
+
+        {profileTab === "about" && <>
         <Pressable style={styles.plainSection} onPress={() => setInterestsOpen(true)}>
           <View style={styles.cardHeader}>
             <View><Text style={styles.cardTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View>
@@ -139,6 +150,13 @@ export default function Profile() {
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View>
           {(user.looking_for || []).length ? <View style={styles.lookingWrap}>{(user.looking_for || []).map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View> : <Text style={styles.bio}>Add what you're looking for</Text>}
         </View>
+
+
+        </>}
+
+        {profileTab === "events" && <View style={styles.tabEmpty}><Icon name="calendar-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Events</Text><Text style={styles.tabEmptyText}>Events you create, attend, or choose to share will appear here.</Text></View>}
+        {profileTab === "posts" && <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Posts</Text><Text style={styles.tabEmptyText}>Share plans, questions, photos, and campus moments that help people connect.</Text></View>}
+        {profileTab === "circles" && <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Circles</Text><Text style={styles.tabEmptyText}>Larger Circles you choose to show on your profile will appear here. Daily Circles and DMs stay private.</Text></View>}
 
         <View style={styles.signout}><Button label="Sign out" variant="secondary" onPress={async () => { await signOut(); router.replace("/(auth)/welcome"); }} testID="profile-signout" /></View>
       </ScrollView>
@@ -183,6 +201,7 @@ const styles = StyleSheet.create({
   verifyTitle: { fontWeight: "800", color: colors.onBrandTertiary }, verifySub: { fontSize: 12, color: colors.onBrandTertiary, opacity: .75, marginTop: 2 }, verifyAction: { fontWeight: "800", color: colors.brandPrimary },
   metrics: { marginHorizontal: spacing.xl, marginTop: spacing.xl, flexDirection: "row", alignItems: "center" }, metric: { flex: 1, alignItems: "center", paddingVertical: 6 }, metricNum: { fontSize: 20, fontWeight: "900", color: colors.onSurface }, metricLabel: { fontSize: 11, color: colors.muted, marginTop: 2 }, metricDivider: { width: 1, height: 30, backgroundColor: colors.border },
   card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  profileTabs: { marginTop: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider, flexDirection: "row", paddingHorizontal: spacing.xl }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { fontSize: 13, fontWeight: "700", color: colors.muted }, profileTabTextActive: { color: colors.brandPrimary, fontWeight: "900" }, profileTabLine: { position: "absolute", bottom: -1, height: 3, width: 34, borderRadius: 2, backgroundColor: colors.brandPrimary }, tabEmpty: { alignItems: "center", paddingHorizontal: 42, paddingVertical: 52 }, tabEmptyTitle: { fontSize: 18, fontWeight: "900", color: colors.onSurface, marginTop: 10 }, tabEmptyText: { fontSize: 13, lineHeight: 19, textAlign: "center", color: colors.muted, marginTop: 6 },
   plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
