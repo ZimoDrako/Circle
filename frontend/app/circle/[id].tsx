@@ -253,18 +253,7 @@ export default function CircleChat() {
         }}
       />
 
-      {circle.is_member && circle.type !== "daily" && circle.type !== "dm" && (
-        <View style={styles.profileVisibilityWrap}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.profileVisibilityTitle}>Show this Circle on your profile?</Text>
-            <Text style={styles.profileVisibilityMeta}>You control your own profile. Other members choose separately.</Text>
-          </View>
-          <Pressable onPress={toggleProfileVisibility} disabled={profileVisibilityBusy} style={[styles.profileVisibilityBtn, (circle.profile_visible_member_ids || []).includes(user?.id) && styles.profileVisibilityBtnOn]} testID="circle-profile-visibility">
-            <Icon name={(circle.profile_visible_member_ids || []).includes(user?.id) ? "eye" : "eye-off-outline"} size={16} color={(circle.profile_visible_member_ids || []).includes(user?.id) ? colors.onBrandPrimary : colors.brandPrimary} />
-            <Text style={[styles.profileVisibilityBtnText, (circle.profile_visible_member_ids || []).includes(user?.id) && styles.profileVisibilityBtnTextOn]}>{profileVisibilityBusy ? "Saving..." : (circle.profile_visible_member_ids || []).includes(user?.id) ? "Shown on profile" : "Show on profile"}</Text>
-          </Pressable>
-        </View>
-      )}
+
 
       {circle.is_member && circle.type === "daily" && circle.daily_status === "expired" ? (
         <SafeAreaView edges={["bottom"]} style={styles.endedWrap}>
@@ -304,9 +293,31 @@ export default function CircleChat() {
             <Pressable onPress={() => setMembersOpen(false)} style={styles.membersClose} testID="circle-members-close">
               <Icon name="close" size={22} color={themeColors.onSurface} />
             </Pressable>
-            <Text style={styles.membersTitle}>Circle members</Text>
+            <View><Text style={styles.membersTitle}>{circle.type === "club" ? "Club details" : "Circle details"}</Text><Text style={styles.membersHeaderMeta}>{circle.members?.length || 0} members</Text></View>
           </View>
           <FlatList
+            ListHeaderComponent={
+              <View style={styles.chatSettings}>
+                {circle.type !== "daily" && circle.type !== "dm" && (
+                  <Pressable onPress={toggleProfileVisibility} disabled={profileVisibilityBusy} style={styles.settingRow} testID="circle-profile-visibility">
+                    <View style={styles.settingIcon}><Icon name={(circle.profile_visible_member_ids || []).includes(user?.id) ? "eye" : "eye-off-outline"} size={19} color={themeColors.brandPrimary} /></View>
+                    <View style={{ flex: 1 }}><Text style={styles.settingTitle}>Show on my profile</Text><Text style={styles.settingMeta}>Let people see that you're part of this {circle.type === "club" ? "club" : "Circle"}.</Text></View>
+                    <Icon name={(circle.profile_visible_member_ids || []).includes(user?.id) ? "checkmark-circle" : "ellipse-outline"} size={23} color={(circle.profile_visible_member_ids || []).includes(user?.id) ? themeColors.brandPrimary : themeColors.muted} />
+                  </Pressable>
+                )}
+                <View style={[styles.settingRow, styles.settingDisabled]}>
+                  <View style={styles.settingIcon}><Icon name="create-outline" size={19} color={themeColors.muted} /></View>
+                  <View style={{ flex: 1 }}><Text style={styles.settingTitle}>Edit chat name</Text><Text style={styles.settingMeta}>Moderator controls · coming later</Text></View>
+                  <Icon name="lock-closed" size={16} color={themeColors.muted} />
+                </View>
+                <View style={[styles.settingRow, styles.settingDisabled]}>
+                  <View style={styles.settingIcon}><Icon name="image-outline" size={19} color={themeColors.muted} /></View>
+                  <View style={{ flex: 1 }}><Text style={styles.settingTitle}>Chat background</Text><Text style={styles.settingMeta}>Moderator controls · coming later</Text></View>
+                  <Icon name="lock-closed" size={16} color={themeColors.muted} />
+                </View>
+                <Text style={styles.membersSectionLabel}>MEMBERS</Text>
+              </View>
+            }
             data={circle.members || []}
             keyExtractor={(m: any) => m.id}
             contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
@@ -382,6 +393,14 @@ const useStyles = makeStyles((colors) => ({
   membersHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
   membersClose: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary },
   membersTitle: { color: colors.onSurface, fontSize: 18, fontWeight: "800" },
+  membersHeaderMeta: { color: colors.muted, fontSize: 11, marginTop: 1 },
+  chatSettings: { gap: spacing.sm, marginBottom: spacing.md },
+  settingRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
+  settingDisabled: { opacity: 0.62 },
+  settingIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandTertiary },
+  settingTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
+  settingMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  membersSectionLabel: { color: colors.muted, fontSize: 10, fontWeight: "900", letterSpacing: 1, marginTop: spacing.md, marginBottom: 2 },
   memberRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   memberName: { color: colors.onSurface, fontSize: 15, fontWeight: "700" },
   memberMeta: { color: colors.muted, fontSize: 13, marginTop: 2 },
