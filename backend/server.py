@@ -129,6 +129,16 @@ class OnboardingBody(BaseModel):
     onboarding_version: int = 2
 
 
+class ProfileUpdateBody(BaseModel):
+    bio: Optional[str] = Field(default=None, max_length=500)
+    major: Optional[str] = Field(default=None, max_length=120)
+    year: Optional[str] = Field(default=None, max_length=60)
+    interests: Optional[List[str]] = None
+    looking_for: Optional[List[str]] = None
+    profile_photo_url: Optional[str] = None
+    banner_image_url: Optional[str] = None
+
+
 class EventCreateBody(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(min_length=1, max_length=2000)
@@ -297,6 +307,25 @@ async def save_onboarding(body: OnboardingBody, user: dict = Depends(current_use
     result = supabase.table("users").select("*").eq("id", user["id"]).limit(1).execute()
     u = result.data[0] if result.data else None
     return {"user": public_user(u)}
+
+
+@api.patch("/profile")
+async def update_profile(body: ProfileUpdateBody, user: dict = Depends(current_user)):
+    update = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
+    if not update:
+        return {"user": public_user(user)}
+    if "interests" in update:
+        clean_interests = list(dict.fromkeys(str(x).strip() for x in (update["interests"] or []) if str(x).strip()))
+        update["interests"] = clean_interests
+        update["interest_levels"] = {x: 1.0 for x in clean_interests}
+        update["inferred_interests"] = infer_interests(clean_interests)
+    if "looking_for" in update:
+        update["looking_for"] = list(dict.fromkeys(str(x).strip() for x in (update["looking_for"] or []) if str(x).strip()))
+    merged = {**user, **update}
+    update["matching_profile"] = build_matching_profile(merged)
+    supabase.table("users").update(update).eq("id", user["id"]).execute()
+    result = supabase.table("users").select("*").eq("id", user["id"]).limit(1).execute()
+    return {"user": public_user(result.data[0] if result.data else merged)}
 
 
 # ---------------------------------------------------------------------------
