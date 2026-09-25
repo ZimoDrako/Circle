@@ -10,7 +10,7 @@ import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 export default function Profile() {
-  const { user, refresh, signOut } = useAuth();
+  const { user, refresh } = useAuth();
   const router = useRouter();
   const [verifying, setVerifying] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
@@ -90,7 +90,7 @@ export default function Profile() {
       <SafeAreaView edges={["top"]} style={styles.safeTop}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Profile</Text>
-          <Pressable style={styles.iconButton}><Icon name="settings-outline" size={22} color={colors.onSurface} /></Pressable>
+          <Pressable style={styles.iconButton} onPress={() => router.push("/settings")} testID="profile-settings"><Icon name="settings-outline" size={22} color={colors.onSurface} /></Pressable>
         </View>
       </SafeAreaView>
 
@@ -195,7 +195,6 @@ export default function Profile() {
           {myCircles.some((circle: any) => circle.type === "daily") && <Text style={styles.privateNote}>Daily Circles stay private and never appear on your public profile.</Text>}
         </View>}
 
-        <View style={styles.signout}><Button label="Sign out" variant="secondary" onPress={async () => { await signOut(); router.replace("/(auth)/welcome"); }} testID="profile-signout" /></View>
       </ScrollView>
 
       <Modal visible={connectionsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setConnectionsOpen(false)}>
