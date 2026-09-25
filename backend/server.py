@@ -1238,7 +1238,7 @@ async def get_circle(
         raise HTTPException(404, "Not found")
 
     if (
-        c.get("type") == "dm"
+        c.get("type") in ("dm", "daily")
         and user["id"] not in (c.get("member_ids") or [])
     ):
         raise HTTPException(404, "Not found")
