@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar, EmptyState, Chip, CompatibilityBadge } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
@@ -12,6 +12,7 @@ type Seg = "mine" | "messages" | "all";
 
 export default function Circles() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { user } = useAuth();
   const [seg, setSeg] = useState<Seg>("mine");
@@ -226,7 +227,7 @@ export default function Circles() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
@@ -252,4 +253,4 @@ const styles = StyleSheet.create({
   declineBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceTertiary, alignItems: "center", justifyContent: "center" },
   acceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
   dmRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary },
-});
+}));
