@@ -156,7 +156,7 @@ export default function EventDetail() {
                       return n;
                     })
                   }
-                  style={[styles.attRow, isSel && { borderColor: colors.brandPrimary, backgroundColor: colors.brandTertiary }]}
+                  style={[styles.attRow, isSel && { borderColor: themeColors.brandPrimary, backgroundColor: themeColors.brandTertiary }]}
                 >
                   <Avatar uri={a.user.profile_photo_url} name={a.user.first_name} size={48} />
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
@@ -167,7 +167,7 @@ export default function EventDetail() {
                     <Text numberOfLines={1} style={styles.attMeta}>{(a.shared_interests || []).slice(0, 3).join(" · ") || a.user.major}</Text>
                     <Text style={styles.attStatus}>{a.status === "going" ? "Going" : "Interested"}</Text>
                   </View>
-                  <View style={[styles.check, isSel && { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary }]}>
+                  <View style={[styles.check, isSel && { backgroundColor: themeColors.brandPrimary, borderColor: themeColors.brandPrimary }]}>
                     {isSel && <Icon name="checkmark" size={16} color={themeColors.onBrandPrimary} />}
                   </View>
                 </Pressable>
