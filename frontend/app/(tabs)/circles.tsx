@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Avatar, EmptyState, Chip, CompatibilityBadge } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
@@ -11,6 +11,7 @@ import { useAuth } from "@/src/auth";
 type Seg = "mine" | "messages" | "all";
 
 export default function Circles() {
+  const { colors: themeColors } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
   const [seg, setSeg] = useState<Seg>("mine");
@@ -70,7 +71,7 @@ export default function Circles() {
     return (
       <Pressable testID="lounge-card" onPress={() => router.push(`/circle/${c.id}`)} style={[styles.card, styles.loungeOpen]}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={[styles.lockIcon, { backgroundColor: colors.brandPrimary }]}><Icon name="shield-checkmark" size={20} color={colors.onBrandPrimary} /></View>
+          <View style={[styles.lockIcon, { backgroundColor: colors.brandPrimary }]}><Icon name="shield-checkmark" size={20} color={themeColors.onBrandPrimary} /></View>
           <View style={{ flex: 1, marginLeft: spacing.md }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={styles.name}>{c.name}</Text>
@@ -97,7 +98,7 @@ export default function Circles() {
         <View style={{ flex: 1, marginLeft: spacing.md }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={styles.name}>{c.name}</Text>
-            {c.verified_only && <Icon name="shield-checkmark" size={14} color={colors.brandPrimary} />}
+            {c.verified_only && <Icon name="shield-checkmark" size={14} color={themeColors.brandPrimary} />}
           </View>
           <Text style={styles.meta}>{c.member_ids.length} members</Text>
         </View>
@@ -112,7 +113,7 @@ export default function Circles() {
       </View>
       {c.shared_with_you?.length > 0 && (
         <View style={styles.whyRow}>
-          <Icon name="sparkles" size={12} color={colors.brandPrimary} />
+          <Icon name="sparkles" size={12} color={themeColors.brandPrimary} />
           <Text style={styles.whyText}>You share {c.shared_with_you.slice(0, 3).join(", ")}</Text>
         </View>
       )}
@@ -156,7 +157,7 @@ export default function Circles() {
                 <Icon name="close" size={18} color={colors.onSurfaceSecondary} />
               </Pressable>
               <Pressable onPress={() => accept(r.id)} style={styles.acceptBtn} testID={`request-accept-${r.id}`}>
-                <Icon name="checkmark" size={18} color={colors.onBrandPrimary} />
+                <Icon name="checkmark" size={18} color={themeColors.onBrandPrimary} />
               </Pressable>
             </View>
           ))}
