@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar, CompatibilityBadge, Chip, EmptyState } from "@/src/ui";
 import { api } from "@/src/api";
 
@@ -13,6 +13,7 @@ const TABS = ["Events", "People", "Recommendations", "Clubs"] as const;
 
 export default function Discover() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Events");
   const [q, setQ] = useState("");
@@ -201,7 +202,7 @@ export default function Discover() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface, marginBottom: spacing.md },
@@ -236,4 +237,4 @@ const styles = StyleSheet.create({
   clubName: { color: colors.onSurface, fontWeight: "700", fontSize: 14 },
   clubMeta: { color: colors.muted, fontSize: 12, marginTop: 2, lineHeight: 16 },
   clubCount: { color: colors.brandPrimary, fontSize: 11, fontWeight: "600", marginTop: 6 },
-});
+}));
