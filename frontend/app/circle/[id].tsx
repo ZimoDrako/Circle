@@ -39,14 +39,18 @@ export default function CircleChat() {
 
   useFocusEffect(useCallback(() => {
     loadCircle();
-    loadMessages();
-    api.getCircleFeedback(id!).then((r: any) => setFeedback(r.feedback?.outcome || null)).catch(() => {});
-  }, [id, loadCircle, loadMessages]));
+  }, [loadCircle]));
 
   useEffect(() => {
+    if (!circle?.is_member) {
+      setMessages([]);
+      return;
+    }
+    loadMessages();
+    api.getCircleFeedback(id!).then((r: any) => setFeedback(r.feedback?.outcome || null)).catch(() => {});
     const t = setInterval(loadMessages, 4000);
     return () => clearInterval(t);
-  }, [loadMessages]);
+  }, [circle?.is_member, id, loadMessages]);
 
   const send = async () => {
     const text = input.trim();
@@ -215,10 +219,20 @@ export default function CircleChat() {
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, flexGrow: 1 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
-            <Icon name={circle.is_member ? "chatbubbles-outline" : "lock-closed-outline"} size={40} color={colors.muted} />
-            <Text style={{ color: colors.muted, marginTop: 12 }}>{circle.is_member ? "Say hi to your new Circle" : "Join this Circle to see the conversation"}</Text>
-          </View>
+          circle.is_member ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
+              <Icon name="chatbubbles-outline" size={40} color={colors.muted} />
+              <Text style={{ color: colors.muted, marginTop: 12 }}>Say hi to your new Circle</Text>
+            </View>
+          ) : (
+            <View style={styles.publicDetails}>
+              <View style={styles.publicDetailsIcon}><Icon name="people-circle-outline" size={36} color={colors.brandPrimary} /></View>
+              <Text style={styles.publicDetailsTitle}>About this Circle</Text>
+              <Text style={styles.publicDetailsMeta}>{(circle.member_ids || []).length} members</Text>
+              {(circle.interests || []).length > 0 && <View style={styles.publicInterestWrap}>{circle.interests.slice(0, 6).map((interest: string) => <View key={interest} style={styles.publicInterest}><Text style={styles.publicInterestText}>{interest}</Text></View>)}</View>}
+              <View style={styles.privateChatNotice}><Icon name="lock-closed" size={18} color={colors.brandPrimary} /><View style={{ flex: 1 }}><Text style={styles.privateChatTitle}>Conversation is private</Text><Text style={styles.privateChatText}>Only members of this Circle can read messages or participate in the group chat.</Text></View></View>
+            </View>
+          )
         }
         renderItem={({ item: m }) => {
           if (m.system) {
@@ -361,6 +375,7 @@ const styles = StyleSheet.create({
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
   joinBtn: { margin: spacing.md, padding: spacing.md, backgroundColor: colors.brandPrimary, borderRadius: radius.pill, alignItems: "center" },
   joinText: { color: colors.onBrandPrimary, fontWeight: "700" },
+  publicDetails: { flex: 1, alignItems: "center", paddingHorizontal: spacing.xl, paddingTop: 48 }, publicDetailsIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandTertiary }, publicDetailsTitle: { marginTop: spacing.md, color: colors.onSurface, fontSize: 22, fontWeight: "900" }, publicDetailsMeta: { marginTop: 4, color: colors.muted, fontSize: 13 }, publicInterestWrap: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 7, marginTop: spacing.lg }, publicInterest: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }, publicInterestText: { color: colors.onSurfaceSecondary, fontSize: 12, fontWeight: "700" }, privateChatNotice: { width: "100%", flexDirection: "row", gap: spacing.sm, marginTop: spacing.xl, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.brandTertiary }, privateChatTitle: { color: colors.onBrandTertiary, fontSize: 14, fontWeight: "900" }, privateChatText: { color: colors.onBrandTertiary, fontSize: 12, lineHeight: 17, marginTop: 3 },
   membersPage: { flex: 1, backgroundColor: colors.surface },
   membersHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
   membersClose: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary },
