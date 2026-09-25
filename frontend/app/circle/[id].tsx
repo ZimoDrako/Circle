@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Pla
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
@@ -11,6 +11,7 @@ import { useAuth } from "@/src/auth";
 
 export default function CircleChat() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
@@ -333,7 +334,7 @@ export default function CircleChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   header: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider, backgroundColor: colors.surface },
   title: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
   meta: { color: colors.muted, fontSize: 12 },
@@ -384,4 +385,4 @@ const styles = StyleSheet.create({
   memberRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   memberName: { color: colors.onSurface, fontSize: 15, fontWeight: "700" },
   memberMeta: { color: colors.muted, fontSize: 13, marginTop: 2 },
-});
+}));
