@@ -2,7 +2,7 @@
 import React from "react";
 import { Pressable, Text, View, ActivityIndicator, StyleSheet, ViewStyle, TextStyle, StyleProp } from "react-native";
 import { Image } from "expo-image";
-import { colors, radius, spacing } from "./theme";
+import { radius, spacing, useTheme } from "./theme";
 import Icon from "@react-native-vector-icons/ionicons";
 
 export function Button({
@@ -22,6 +22,7 @@ export function Button({
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
   const isDisabled = disabled || loading;
   const bg =
     variant === "primary" ? colors.brandPrimary : variant === "secondary" ? colors.surfaceTertiary : "transparent";
@@ -67,6 +68,7 @@ export function Chip({
   onPress?: () => void;
   testID?: string;
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       testID={testID}
@@ -102,6 +104,7 @@ export function Avatar({
   name?: string;
   size?: number;
 }) {
+  const { colors } = useTheme();
   const initials = (name || "?")
     .split(" ")
     .map((s) => s[0])
@@ -134,6 +137,7 @@ export function Avatar({
 }
 
 export function CompatibilityBadge({ score }: { score: number }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -153,6 +157,7 @@ export function CompatibilityBadge({ score }: { score: number }) {
 }
 
 export function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -174,6 +179,7 @@ export function SectionTitle({ title, action, onAction }: { title: string; actio
 }
 
 export function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+  const { colors } = useTheme();
   return (
     <View style={{ padding: spacing.xl, alignItems: "center", justifyContent: "center", flex: 1 }}>
       <Icon name="sparkles-outline" size={44} color={colors.muted} />
