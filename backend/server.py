@@ -620,15 +620,59 @@ async def create_post(body: PostCreateBody, user: dict = Depends(current_user)):
 
 
 @api.get("/posts")
-async def list_posts(user: dict = Depends(current_user), user_id: Optional[str] = None):
+async def list_posts(user: dict = Depends(current_user), user_id: Optional[str] = None, feed: str = "for_you"):
     query = supabase.table("posts").select("*")
     if user_id:
         query = query.eq("user_id", user_id)
-    result = query.order("created_at", desc=True).limit(100).execute()
+    result = query.order("created_at", desc=True).limit(150).execute()
     posts = result.data or []
-    if user_id != user["id"]:
-        posts = [p for p in posts if p.get("audience") == "campus"]
-    return {"posts": _decorate_posts(posts)}
+
+    conn_result = supabase.table("connections").select("from_id,to_id").eq("status", "accepted").or_(f"from_id.eq.{user['id']},to_id.eq.{user['id']}").execute()
+    connected_ids = set()
+    for conn in (conn_result.data or []):
+        connected_ids.add(conn["to_id"] if conn["from_id"] == user["id"] else conn["from_id"])
+
+    author_ids = list({p.get("user_id") for p in posts if p.get("user_id")})
+    author_rows = []
+    if author_ids:
+        author_rows = supabase.table("users").select("id,university,interests").in_("id", author_ids).execute().data or []
+    author_map = {u["id"]: u for u in author_rows}
+
+    now = datetime.now(timezone.utc)
+    visible = []
+    for post in posts:
+        if post.get("expires_at"):
+            try:
+                if datetime.fromisoformat(post["expires_at"].replace("Z", "+00:00")) < now:
+                    continue
+            except ValueError:
+                pass
+        if post["user_id"] != user["id"]:
+            if post.get("audience") == "connections" and post["user_id"] not in connected_ids:
+                continue
+            author = author_map.get(post["user_id"]) or {}
+            if user.get("university") and author.get("university") and author["university"] != user["university"]:
+                continue
+        if feed == "connections" and post["user_id"] not in connected_ids and post["user_id"] != user["id"]:
+            continue
+        visible.append(post)
+
+    if not user_id and feed == "for_you":
+        my_interests = set(user.get("interests") or [])
+        def feed_score(post):
+            author = author_map.get(post["user_id"]) or {}
+            shared = len(my_interests & set(author.get("interests") or []))
+            connection_bonus = 5 if post["user_id"] in connected_ids else 0
+            intent_bonus = 3 if post.get("intent") in {"anyone_down", "looking_for_people", "event"} else 0
+            try:
+                age_hours = max(0, (now - datetime.fromisoformat(post["created_at"].replace("Z", "+00:00"))).total_seconds() / 3600)
+            except Exception:
+                age_hours = 168
+            recency = max(0, 12 - min(age_hours, 12))
+            return shared * 2 + connection_bonus + intent_bonus + recency
+        visible.sort(key=feed_score, reverse=True)
+
+    return {"posts": _decorate_posts(visible[:100])}
 
 
 
