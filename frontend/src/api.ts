@@ -56,6 +56,9 @@ export const api = {
   listPosts: (userId?: string) => req(`/posts${userId ? `?user_id=${encodeURIComponent(userId)}` : ""}`),
   createPost: (body: any) => req("/posts", { method: "POST", body: JSON.stringify(body) }),
   deletePost: (id: string) => req(`/posts/${id}`, { method: "DELETE" }),
+  togglePostInterest: (id: string) => req(`/posts/${id}/interest`, { method: "POST" }),
+  listPostReplies: (id: string) => req(`/posts/${id}/replies`),
+  createPostReply: (id: string, content: string) => req(`/posts/${id}/replies`, { method: "POST", body: JSON.stringify({ content }) }),
   listEvents: (params: { category?: string; q?: string } = {}) => {
     const qs = new URLSearchParams();
     if (params.category) qs.set("category", params.category);
