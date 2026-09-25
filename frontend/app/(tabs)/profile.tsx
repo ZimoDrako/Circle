@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -25,7 +25,7 @@ export default function Profile() {
   useFocusEffect(useCallback(() => {
     (async () => {
       try {
-        const [circles, conns, eventData, postData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents(), api.listPosts(user.id)]);
+        const [circles, conns, eventData, postData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents(), user?.id ? api.listPosts(user.id) : Promise.resolve({ posts: [] })]);
         setEvents(eventData.events || []);
         setPosts(postData.posts || []);
         const mine = (circles.circles || []).filter((c: any) => c.type !== "dm");
@@ -34,7 +34,7 @@ export default function Profile() {
         setConnections(conns.connected || []);
       } catch {}
     })();
-  }, []));
+  }, [user?.id]));
 
   if (!user) return null;
 
