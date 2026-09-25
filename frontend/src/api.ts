@@ -53,6 +53,9 @@ export const api = {
   getUserConnections: (id: string) => req(`/users/${id}/connections`),
   listUsers: (q?: string) => req(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
 
+  listPosts: (userId?: string) => req(`/posts${userId ? `?user_id=${encodeURIComponent(userId)}` : ""}`),
+  createPost: (body: any) => req("/posts", { method: "POST", body: JSON.stringify(body) }),
+  deletePost: (id: string) => req(`/posts/${id}`, { method: "DELETE" }),
   listEvents: (params: { category?: string; q?: string } = {}) => {
     const qs = new URLSearchParams();
     if (params.category) qs.set("category", params.category);
