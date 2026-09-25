@@ -4,13 +4,14 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar, Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 export default function Profile() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const { user, refresh } = useAuth();
   const router = useRouter();
   const [verifying, setVerifying] = useState(false);
@@ -223,7 +224,7 @@ export default function Profile() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface }, safeTop: { backgroundColor: colors.surface },
   header: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.xl },
   headerTitle: { fontSize: 20, fontWeight: "800", color: colors.onSurface }, iconButton: { padding: 6 },
@@ -250,4 +251,4 @@ const styles = StyleSheet.create({
   previewRow: { flexDirection: "row", justifyContent: "space-between", gap: 3, marginTop: spacing.sm }, previewTile: { flex: 1, minWidth: 0, maxWidth: "20%", alignItems: "center", gap: 5, paddingVertical: 4 }, modalInterestGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }, modalInterestTile: { width: "29%", alignItems: "center", gap: 7, paddingVertical: 8 }, modalInterestName: { color: colors.onSurface, fontSize: 12, fontWeight: "700", textAlign: "center", width: "100%" }, interestEmblem: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, interestName: { color: colors.onSurface, fontSize: 11, fontWeight: "700", maxWidth: 88, textAlign: "center" }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
   signout: { paddingHorizontal: spacing.xl, marginTop: spacing.xl }, modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 },
   empty: { color: colors.muted, textAlign: "center", marginTop: spacing.xxxl }, personRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, personName: { color: colors.onSurface, fontSize: 15, fontWeight: "800" }, personMeta: { color: colors.muted, fontSize: 12, marginTop: 3 },
-});
+}));
