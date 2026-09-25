@@ -20,6 +20,7 @@ export default function CircleChat() {
   const [keepBusy, setKeepBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [profileVisibilityBusy, setProfileVisibilityBusy] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const loadCircle = useCallback(async () => {
@@ -83,6 +84,23 @@ export default function CircleChat() {
       setFeedback(r.feedback?.outcome || outcome);
     } finally {
       setFeedbackBusy(false);
+    }
+  };
+
+  const toggleProfileVisibility = async () => {
+    if (!user || profileVisibilityBusy || circle.type === "daily" || circle.type === "dm") return;
+    const shown = (circle.profile_visible_member_ids || []).includes(user.id);
+    setProfileVisibilityBusy(true);
+    try {
+      await api.setCircleProfileVisibility(circle.id, !shown);
+      setCircle((current: any) => ({
+        ...current,
+        profile_visible_member_ids: !shown
+          ? [...(current.profile_visible_member_ids || []), user.id]
+          : (current.profile_visible_member_ids || []).filter((uid: string) => uid !== user.id),
+      }));
+    } finally {
+      setProfileVisibilityBusy(false);
     }
   };
 
@@ -219,6 +237,19 @@ export default function CircleChat() {
         }}
       />
 
+      {circle.is_member && circle.type !== "daily" && circle.type !== "dm" && (
+        <View style={styles.profileVisibilityWrap}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.profileVisibilityTitle}>Show this Circle on your profile?</Text>
+            <Text style={styles.profileVisibilityMeta}>You control your own profile. Other members choose separately.</Text>
+          </View>
+          <Pressable onPress={toggleProfileVisibility} disabled={profileVisibilityBusy} style={[styles.profileVisibilityBtn, (circle.profile_visible_member_ids || []).includes(user?.id) && styles.profileVisibilityBtnOn]} testID="circle-profile-visibility">
+            <Icon name={(circle.profile_visible_member_ids || []).includes(user?.id) ? "eye" : "eye-off-outline"} size={16} color={(circle.profile_visible_member_ids || []).includes(user?.id) ? colors.onBrandPrimary : colors.brandPrimary} />
+            <Text style={[styles.profileVisibilityBtnText, (circle.profile_visible_member_ids || []).includes(user?.id) && styles.profileVisibilityBtnTextOn]}>{profileVisibilityBusy ? "Saving..." : (circle.profile_visible_member_ids || []).includes(user?.id) ? "Shown on profile" : "Show on profile"}</Text>
+          </Pressable>
+        </View>
+      )}
+
       {circle.is_member && circle.type === "daily" && circle.daily_status === "expired" ? (
         <SafeAreaView edges={["bottom"]} style={styles.endedWrap}>
           <Icon name="time-outline" size={18} color={colors.muted} />
@@ -323,6 +354,7 @@ const styles = StyleSheet.create({
   endedWrap: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surfaceSecondary, borderTopWidth: 1, borderTopColor: colors.divider },
   endedTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "800" },
   endedMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  profileVisibilityWrap: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider }, profileVisibilityTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "800" }, profileVisibilityMeta: { color: colors.muted, fontSize: 11, marginTop: 2 }, profileVisibilityBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.brandPrimary, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 9 }, profileVisibilityBtnOn: { backgroundColor: colors.brandPrimary }, profileVisibilityBtnText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" }, profileVisibilityBtnTextOn: { color: colors.onBrandPrimary },
   inputWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
   inputRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, gap: spacing.sm },
   input: { flex: 1, backgroundColor: colors.surfaceSecondary, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 12, fontSize: 14, color: colors.onSurface, borderWidth: 1, borderColor: colors.border },
