@@ -4,12 +4,14 @@ import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function RecommendationDetail() {
+  const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [recommendation, setRecommendation] = useState<any>(null);
@@ -33,7 +35,7 @@ export default function RecommendationDetail() {
       <SafeAreaView edges={["top"]}>
         <View style={styles.header}>
           <Pressable onPress={() => router.replace("/(tabs)/discover")} testID="recommendation-back">
-            <Icon name="chevron-back" size={26} color={colors.onSurface} />
+            <Icon name="chevron-back" size={26} color={themeColors.onSurface} />
           </Pressable>
           <Text style={styles.headerTitle}>Recommendation</Text>
           <View style={{ width: 26 }} />
@@ -47,7 +49,7 @@ export default function RecommendationDetail() {
 
         {r.location ? (
           <View style={styles.metaRow}>
-            <Icon name="location-outline" size={17} color={colors.brandPrimary} />
+            <Icon name="location-outline" size={17} color={themeColors.brandPrimary} />
             <Text style={styles.meta}>{r.location}</Text>
           </View>
         ) : null}
@@ -73,7 +75,7 @@ export default function RecommendationDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   loading: { padding: 24, color: colors.muted },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
@@ -91,4 +93,4 @@ const styles = StyleSheet.create({
   tags: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.lg },
   tag: { paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary },
   tagText: { color: colors.brandPrimary, fontSize: 12, fontWeight: "600" },
-});
+}));
