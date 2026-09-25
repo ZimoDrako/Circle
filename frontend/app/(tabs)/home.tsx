@@ -72,8 +72,9 @@ export default function Home() {
       >
         <View style={styles.header}>
           <Pressable onPress={() => router.push("/(tabs)/profile")} style={styles.profileShortcut} testID="home-profile">
-            <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={56} />
+            <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={52} />
           </Pressable>
+          <Text style={styles.wordmark}>Circle</Text>
           <Pressable onPress={() => router.push("/activity")} style={styles.bellButton} testID="home-activity">
             <Icon name="notifications-outline" size={23} color={themeColors.onSurface} />
             {unreadCount > 0 && (
@@ -86,7 +87,7 @@ export default function Home() {
 
         <View style={styles.feedHeader}>
           <View><Text style={styles.feedKicker}>CAMPUS FEED</Text><Text style={styles.feedTitle}>What's happening</Text></View>
-          <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.feedCreate} testID="home-create-menu"><Icon name="add" size={21} color={themeColors.onBrandPrimary} /></Pressable>
+          <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.feedCreate} testID="home-create-menu"><Icon name="add" size={27} color={themeColors.onSurface} /></Pressable>
         </View>
         <View style={styles.feedTabs}>
           <Pressable onPress={() => setFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
@@ -116,26 +117,28 @@ export default function Home() {
         ))}
 
         {digest && digest.total_events > 0 && (
-          <View style={styles.section}>
-            <Pressable testID="weekend-digest" onPress={() => router.push("/digest")} style={[styles.digest, digest.is_friday && styles.digestFriday]}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.digestKicker}>{digest.is_friday ? "FRIDAY DIGEST" : "WEEKEND DIGEST"} · {digest.weekend_label}</Text>
-                  <Text style={styles.digestTitle}>{digest.headline}</Text>
-                  <Text style={styles.digestMeta}>{digest.total_events} events Fri–Sun · tap to plan ahead</Text>
-                </View>
-                <Icon name="arrow-forward-circle" size={32} color={themeColors.brandPrimary} />
+          <View style={styles.weekendSection}>
+            <View style={styles.weekendHeader}>
+              <View>
+                <Text style={styles.weekendKicker}>THIS WEEKEND</Text>
+                <Text style={styles.weekendTitle}>{digest.weekend_label}</Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, marginTop: spacing.md }}>
-                {digestEvents.slice(0, 6).map((e: any) => (
-                  <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={styles.digestChip}>
-                    <Text style={styles.digestChipDay}>{e.dayLabel.slice(0, 3).toUpperCase()} · {e.time}</Text>
-                    <Text numberOfLines={1} style={styles.digestChipTitle}>{e.title}</Text>
-                    {e.vibe_count > 0 && <Text style={styles.digestChipVibe}>{e.vibe_count} you vibe with going</Text>}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </Pressable>
+              <Pressable onPress={() => router.push("/digest")} testID="weekend-digest">
+                <Text style={styles.weekendSee}>See weekend →</Text>
+              </Pressable>
+            </View>
+            <View style={styles.weekendList}>
+              {digestEvents.slice(0, 3).map((e: any) => (
+                <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={styles.weekendEvent}>
+                  <View style={styles.weekendDay}><Text style={styles.weekendDayText}>{e.dayLabel.slice(0, 3).toUpperCase()}</Text></View>
+                  <View style={styles.weekendEventBody}>
+                    <Text numberOfLines={1} style={styles.weekendEventTitle}>{e.title}</Text>
+                    <Text style={styles.weekendEventMeta}>{e.time}{e.vibe_count > 0 ? ` · ${e.vibe_count} you vibe with going` : ""}</Text>
+                  </View>
+                  <Icon name="chevron-forward" size={18} color={themeColors.muted} />
+                </Pressable>
+              ))}
+            </View>
           </View>
         )}
 
@@ -237,14 +240,15 @@ export default function Home() {
 
 const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  profileShortcut: { borderRadius: 30 },
-  bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  header: { height: 68, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.xl },
+  profileShortcut: { width: 52, height: 52, borderRadius: 26 },
+  wordmark: { position: "absolute", left: 80, right: 80, textAlign: "center", color: colors.onSurface, fontSize: 20, fontWeight: "900", letterSpacing: -0.5 },
+  bellButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   notificationBadge: { position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.error, borderWidth: 2, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   notificationBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", lineHeight: 11 },
   feedHeader: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   feedKicker: { fontSize: 10, fontWeight: "900", letterSpacing: 1.1, color: colors.brandPrimary }, feedTitle: { fontSize: 23, fontWeight: "900", color: colors.onSurface, marginTop: 2 },
-  feedCreate: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
+  feedCreate: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   feedTabs: { marginHorizontal: spacing.xl, marginTop: spacing.md, flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.divider }, feedTab: { paddingVertical: 10, marginRight: 24 }, feedTabActive: { borderBottomWidth: 2, borderBottomColor: colors.brandPrimary }, feedTabText: { color: colors.muted, fontSize: 13, fontWeight: "700" }, feedTabTextActive: { color: colors.onSurface, fontWeight: "900" },
   feed: { paddingHorizontal: spacing.xl, minHeight: 360 }, feedPost: { flexDirection: "row", gap: 10, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.divider }, feedPostBody: { flex: 1 }, feedPostTop: { flexDirection: "row", alignItems: "center", gap: 7 }, feedPostName: { flexShrink: 1, color: colors.onSurface, fontSize: 14, fontWeight: "900" }, feedPostIntent: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" }, feedPostText: { color: colors.onSurface, fontSize: 15, lineHeight: 21, marginTop: 6 }, feedPostActions: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 9 }, feedDown: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" }, feedEmpty: { alignItems: "center", paddingVertical: 32, paddingHorizontal: 28 }, feedEmptyTitle: { color: colors.onSurface, fontSize: 16, fontWeight: "900", marginTop: 8 }, feedEmptyText: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
   section: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
@@ -271,15 +275,18 @@ const useStyles = makeStyles((colors) => ({
   reminderIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
   reminderTitle: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 14 },
   reminderMeta: { color: colors.onBrandPrimary, fontSize: 12, marginTop: 2, opacity: 0.9 },
-  digest: { padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.brandTertiary, borderWidth: 1, borderColor: colors.border, marginTop: spacing.lg },
-  digestFriday: { borderColor: colors.brandPrimary, borderWidth: 2 },
-  digestKicker: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
-  digestTitle: { color: colors.onBrandTertiary, fontSize: 18, fontWeight: "800", marginTop: 4 },
-  digestMeta: { color: colors.onBrandTertiary, fontSize: 12, marginTop: 2, opacity: 0.8 },
-  digestChip: { width: 150, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface },
-  digestChipDay: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  digestChipTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "700", marginTop: 2 },
-  digestChipVibe: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  weekendSection: { marginHorizontal: spacing.xl, marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.divider },
+  weekendHeader: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: spacing.sm },
+  weekendKicker: { color: colors.brandPrimary, fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
+  weekendTitle: { color: colors.onSurface, fontSize: 20, fontWeight: "900", marginTop: 2 },
+  weekendSee: { color: colors.brandPrimary, fontSize: 12, fontWeight: "800", paddingVertical: 4 },
+  weekendList: { borderTopWidth: 1, borderTopColor: colors.divider },
+  weekendEvent: { minHeight: 66, flexDirection: "row", alignItems: "center", gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  weekendDay: { width: 42, height: 30, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" },
+  weekendDayText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
+  weekendEventBody: { flex: 1, minWidth: 0 },
+  weekendEventTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
+  weekendEventMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
   createOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
   createSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: spacing.xl, paddingTop: 10, paddingBottom: 36 },
   createHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: "center", marginBottom: spacing.lg },
