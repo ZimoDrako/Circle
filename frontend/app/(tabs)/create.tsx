@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, KeyboardAvoid
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 
@@ -11,6 +11,7 @@ const CATEGORIES = ["Gaming", "Sports", "Food", "Study", "Culture", "Art", "Tech
 
 export default function Create() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const [mode, setMode] = useState<"pick" | "event" | "rec">("pick");
   const [title, setTitle] = useState("");
@@ -161,6 +162,8 @@ export default function Create() {
 }
 
 function ChoiceCard({ icon, title, sub, onPress, testID }: any) {
+  const styles = useStyles();
+  const { colors: themeColors } = useTheme();
   return (
     <Pressable testID={testID} onPress={onPress} style={styles.choice}>
       <View style={styles.iconWrap}>
@@ -170,12 +173,12 @@ function ChoiceCard({ icon, title, sub, onPress, testID }: any) {
         <Text style={styles.choiceTitle}>{title}</Text>
         <Text style={styles.choiceSub}>{sub}</Text>
       </View>
-      <Icon name="chevron-forward" size={20} color={colors.muted} />
+      <Icon name="chevron-forward" size={20} color={themeColors.muted} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { padding: spacing.xl },
   title: { fontSize: 26, fontWeight: "800", color: colors.onSurface },
@@ -191,7 +194,7 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   error: { color: colors.error, fontSize: 13, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   footer: { padding: spacing.xl, borderTopWidth: 1, borderTopColor: colors.divider },
-});
+}));
 
 const webPickerStyle: any = {
   width: "100%",
