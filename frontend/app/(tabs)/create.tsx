@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, KeyboardAvoid
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 
 const CATEGORIES = ["Gaming", "Sports", "Food", "Study", "Culture", "Art", "Tech", "Outdoor", "Casual", "Networking", "Service"];
 
 export default function Create() {
+  const { colors: themeColors } = useTheme();
   const router = useRouter();
   const [mode, setMode] = useState<"pick" | "event" | "rec">("pick");
   const [title, setTitle] = useState("");
@@ -163,7 +164,7 @@ function ChoiceCard({ icon, title, sub, onPress, testID }: any) {
   return (
     <Pressable testID={testID} onPress={onPress} style={styles.choice}>
       <View style={styles.iconWrap}>
-        <Icon name={icon} size={22} color={colors.onBrandPrimary} />
+        <Icon name={icon} size={22} color={themeColors.onBrandPrimary} />
       </View>
       <View style={{ flex: 1, marginLeft: spacing.md }}>
         <Text style={styles.choiceTitle}>{title}</Text>
