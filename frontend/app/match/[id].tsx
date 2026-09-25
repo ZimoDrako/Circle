@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image } from "react-native";
+import Svg, { Circle as SvgCircle } from "react-native-svg";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -90,15 +91,17 @@ export default function MatchDetail() {
             <Text style={styles.profileBio}>{u.bio || `${u.first_name} hasn't added a bio yet.`}</Text>
           </View>
           <Pressable style={styles.matchBadge} onPress={() => setMatchOpen(true)} testID="match-score">
-            <Icon name="sparkles" size={15} color={colors.brandPrimary} />
+            <Svg width={82} height={82} style={styles.matchProgress}>
+              <SvgCircle cx={41} cy={41} r={35} fill="none" stroke={colors.brandTertiary} strokeWidth={7} />
+              <SvgCircle cx={41} cy={41} r={35} fill="none" stroke={colors.brandPrimary} strokeWidth={7} strokeLinecap="round" strokeDasharray={219.9} strokeDashoffset={219.9 * (1 - Math.max(0, Math.min(100, data.compatibility || 0)) / 100)} transform="rotate(-90 41 41)" />
+            </Svg>
             <Text style={styles.matchScore}>{data.compatibility}%</Text>
-            <Text style={styles.matchLabel}>Match · Why?</Text>
+            <Text style={styles.matchLabel}>Match</Text>
           </Pressable>
         </View>
 
         <View style={styles.actions}>
           <Button label={connectLabel} onPress={onConnect} loading={connecting} disabled={conn.status === "pending_out"} style={{ flex: 1 }} testID="match-connect" />
-          {conn.status !== "connected" && <Button label="Maybe later" variant="secondary" onPress={() => router.back()} style={{ flex: 1 }} testID="match-later" />}
         </View>
 
         <View style={styles.metrics}>
@@ -128,12 +131,6 @@ export default function MatchDetail() {
           </View>
           <View style={styles.previewRow}>{preview.map((i: string) => { const shared = sharedNorm.has(i.trim().toLowerCase()); return <View key={i} style={styles.previewTile}><View style={[styles.interestEmblem, shared && styles.interestShared]}><Icon name={interestIcon(i) as any} size={20} color={shared ? colors.onBrandPrimary : colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text>{shared && <Text style={styles.sharedLabel}>Both</Text>}</View>; })}{sortedInterests.length > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{sortedInterests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
         </Pressable>
-
-        <View style={styles.youTwo}>
-          <View style={styles.cardHeader}><View style={styles.youTitle}><Icon name="sparkles" size={18} color={colors.brandPrimary} /><Text style={styles.cardTitle}>You two</Text></View><Text style={styles.youScore}>{data.compatibility}% match</Text></View>
-          {(data.reasons || []).slice(0, 4).map((r: string, i: number) => <View key={i} style={styles.reason}><Icon name={i === 0 ? "heart-outline" : "checkmark-circle-outline"} size={17} color={colors.brandPrimary} /><Text style={styles.reasonText}>{r}</Text></View>)}
-          {!(data.reasons || []).length && <Text style={styles.bio}>As you use Circle, we'll show more about why you match here.</Text>}
-        </View>
 
         {(u.looking_for || []).length > 0 && <View style={styles.plainSection}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View><View style={styles.lookingWrap}>{u.looking_for.map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View></View>}
         </>}
@@ -208,7 +205,7 @@ const styles = StyleSheet.create({
   header: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }, headerBtn: { padding: 6 }, headerTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   content: { paddingBottom: 36 }, hero: { minHeight: 300, paddingHorizontal: spacing.xl, paddingTop: 150, paddingBottom: spacing.xl, backgroundColor: colors.surface, overflow: "hidden" },
   banner: { position: "absolute", top: 0, left: 0, right: 0, height: 185, backgroundColor: colors.brandTertiary }, bannerImage: { width: "100%", height: "100%" }, bannerFallback: { flex: 1, backgroundColor: colors.brandTertiary }, identity: { marginTop: spacing.md, paddingRight: 92 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }, name: { fontSize: 25, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 13, marginTop: 3 }, profileBio: { color: colors.onSurfaceSecondary, fontSize: 13, lineHeight: 18, marginTop: 9, maxWidth: 255 },
-  matchBadge: { position: "absolute", right: spacing.xl, bottom: spacing.xl, minWidth: 82, paddingHorizontal: 10, height: 82, borderRadius: 24, borderWidth: 1.5, borderColor: colors.brandPrimary, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 17 }, matchLabel: { color: colors.brandPrimary, fontWeight: "800", fontSize: 9, marginTop: 1 },
+  matchBadge: { position: "absolute", right: spacing.xl, bottom: spacing.xl, width: 82, height: 82, borderRadius: 41, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }, matchProgress: { position: "absolute", top: 0, left: 0 }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 17 }, matchLabel: { color: colors.muted, fontWeight: "800", fontSize: 9, marginTop: 1 },
   actions: { flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.xl }, metrics: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", paddingVertical: spacing.md, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.divider }, metric: { flex: 1, alignItems: "center" }, metricNum: { color: colors.onSurface, fontSize: 18, fontWeight: "900" }, metricLabel: { color: colors.muted, fontSize: 11, marginTop: 2 }, metricDivider: { width: 1, height: 28, backgroundColor: colors.divider },
   profileTabs: { flexDirection: "row", marginTop: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { color: colors.muted, fontSize: 13, fontWeight: "800" }, profileTabTextActive: { color: colors.onSurface }, profileTabLine: { position: "absolute", left: "24%", right: "24%", bottom: -1, height: 2, borderRadius: 2, backgroundColor: colors.brandPrimary },
   plainSection: { marginHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }, cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { color: colors.onSurface, fontWeight: "800", fontSize: 17 }, cardSub: { color: colors.muted, fontSize: 12, marginTop: 2 }, bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
