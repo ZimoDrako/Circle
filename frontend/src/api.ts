@@ -70,6 +70,8 @@ export const api = {
   listDMs: () => req("/circles?dm=true"),
   getLounge: () => req("/lounge"),
   getCircle: (id: string) => req(`/circles/${id}`),
+  getUserProfileCircles: (userId: string) => req(`/users/${userId}/circles`),
+  setCircleProfileVisibility: (id: string, show: boolean) => req(`/circles/${id}/profile-visibility?show=${show}`, { method: "PATCH" }),
   createCircle: (body: any) => req("/circles", { method: "POST", body: JSON.stringify(body) }),
   joinCircle: (id: string) => req(`/circles/${id}/join`, { method: "POST" }),
   leaveCircle: (id: string) => req(`/circles/${id}/leave`, { method: "POST" }),
