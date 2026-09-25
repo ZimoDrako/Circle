@@ -45,7 +45,7 @@ export function ThemeProvider({children}:{children:React.ReactNode}){
  useEffect(()=>{loadDisplaySettings().then(x=>{setScheme(x.scheme);setAccent(x.accent);setReady(true);});},[]);
  const setDisplay=async(s:ColorScheme,a:AccentName)=>{setScheme(s);setAccent(a);await saveDisplaySettings(s,a);};
  const value=useMemo(()=>({scheme,accent,colors:palette(scheme,accent),setDisplay,ready}),[scheme,accent,ready]);
- return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+ return React.createElement(ThemeContext.Provider,{value},children);
 }
 export function useTheme(){return useContext(ThemeContext);}
 export function makeStyles<T extends StyleSheet.NamedStyles<T>|StyleSheet.NamedStyles<any>>(factory:(colors:ThemeColors)=>T&StyleSheet.NamedStyles<any>){return function(){const {colors}=useTheme();return useMemo(()=>StyleSheet.create(factory(colors)),[colors]);};}
