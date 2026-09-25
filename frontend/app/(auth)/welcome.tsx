@@ -3,10 +3,12 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Button } from "@/src/ui";
 
 export default function Welcome() {
+  const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   return (
     <View style={styles.root}>
@@ -49,7 +51,7 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surfaceInverse },
   safe: { flex: 1, paddingHorizontal: spacing.xl, justifyContent: "space-between" },
   top: { paddingTop: spacing.lg },
@@ -60,4 +62,4 @@ const styles = StyleSheet.create({
   title: { color: "#FFFFFF", fontSize: 32, fontWeight: "800", lineHeight: 38 },
   subtitle: { color: "rgba(255,255,255,0.85)", fontSize: 15, marginTop: spacing.md, lineHeight: 22 },
   loginLink: { color: "#FFFFFF", textAlign: "center", fontWeight: "600", fontSize: 15, paddingVertical: 12 },
-});
+}));
