@@ -173,8 +173,6 @@ export default function Profile() {
           <ScrollView contentContainerStyle={styles.modalContent}><View style={styles.interestGrid}>{(user.interests || []).map((i: string) => <View key={i} style={styles.interestTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text></View>)}</View></ScrollView>
         </SafeAreaView>
       </Modal>
-
-      <MainTabBar />
     </View>
   );
 }
