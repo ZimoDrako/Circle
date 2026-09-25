@@ -44,6 +44,7 @@ export const api = {
   verifyStudent: () => req("/auth/verify-student", { method: "POST" }),
 
   saveOnboarding: (body: any) => req("/onboarding", { method: "POST", body: JSON.stringify(body) }),
+  updateProfile: (body: any) => req("/profile", { method: "PATCH", body: JSON.stringify(body) }),
 
   getMatches: () => req("/matches"),
   saveMatchFeedback: (userId: string, outcome: "interested" | "not_interested") =>
