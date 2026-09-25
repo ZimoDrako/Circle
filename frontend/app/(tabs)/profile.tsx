@@ -17,6 +17,7 @@ export default function Profile() {
   const [verifying, setVerifying] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
   const [myCircles, setMyCircles] = useState<any[]>([]);
+  const [myClubs, setMyClubs] = useState<any[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
@@ -27,9 +28,10 @@ export default function Profile() {
   useFocusEffect(useCallback(() => {
     (async () => {
       try {
-        const [circles, conns, eventData, postData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents(), user?.id ? api.listPosts(user.id) : Promise.resolve({ posts: [] })]);
+        const [circles, conns, eventData, postData, clubData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents(), user?.id ? api.listPosts(user.id) : Promise.resolve({ posts: [] }), user?.id ? api.getUserClubs(user.id) : Promise.resolve({ clubs: [] })]);
         setEvents(eventData.events || []);
         setPosts(postData.posts || []);
+        setMyClubs(clubData.clubs || []);
         const mine = (circles.circles || []).filter((c: any) => c.type !== "dm");
         setMyCircles(mine);
         setCircleCount(mine.length);
@@ -185,6 +187,15 @@ export default function Profile() {
           </Pressable>)}
         </View>}
         {profileTab === "circles" && <View style={styles.eventsSection}>
+          <View style={styles.groupSectionHead}><Text style={styles.cardTitle}>My Clubs</Text><Text style={styles.cardSub}>{myClubs.length} joined</Text></View>
+          {myClubs.length === 0 ? <View style={styles.groupEmpty}><Text style={styles.tabEmptyText}>Clubs you join will appear here for quick access.</Text></View> : myClubs.map((club: any) => (
+            <Pressable key={club.id} style={styles.circleProfileRow} onPress={() => router.push(`/club/${club.id}`)}>
+              {club.image_url ? <Image source={{ uri: club.image_url }} style={styles.clubThumb} /> : <View style={styles.circleIcon}><Icon name="people" size={22} color={themeColors.brandPrimary} /></View>}
+              <View style={{ flex: 1 }}><Text style={styles.eventTitle}>{club.name}</Text><Text numberOfLines={1} style={styles.eventMeta}>{club.category || `${(club.member_ids || []).length} members`}</Text></View>
+              <Icon name="chevron-forward" size={18} color={themeColors.muted} />
+            </Pressable>
+          ))}
+          <View style={styles.groupSectionHead}><Text style={styles.cardTitle}>My Circles</Text><Text style={styles.cardSub}>{myCircles.filter((circle: any) => circle.type !== "daily").length}</Text></View>
           {myCircles.filter((circle: any) => circle.type !== "daily").length === 0 ? <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={themeColors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No public Circles yet</Text><Text style={styles.tabEmptyText}>Community, hobby, and school Circles can be shown here. Daily Circles and DMs always stay private.</Text></View> : myCircles.filter((circle: any) => circle.type !== "daily").map((circle: any) => {
             const shown = (circle.profile_visible_member_ids || []).includes(user.id);
             return <Pressable key={circle.id} style={styles.circleProfileRow} onPress={() => router.push(`/circle/${circle.id}`)}>
@@ -241,7 +252,7 @@ const useStyles = makeStyles((colors) => ({
   card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   profileTabs: { marginTop: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider, flexDirection: "row", paddingHorizontal: spacing.xl }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { fontSize: 13, fontWeight: "700", color: colors.muted }, profileTabTextActive: { color: colors.brandPrimary, fontWeight: "900" }, profileTabLine: { position: "absolute", bottom: -1, height: 3, width: 34, borderRadius: 2, backgroundColor: colors.brandPrimary }, tabEmpty: { alignItems: "center", paddingHorizontal: 42, paddingVertical: 52 }, tabEmptyTitle: { fontSize: 18, fontWeight: "900", color: colors.onSurface, marginTop: 10 }, tabEmptyText: { fontSize: 13, lineHeight: 19, textAlign: "center", color: colors.muted, marginTop: 6 },
   eventsSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.md }, eventCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, eventCover: { width: 66, height: 66, borderRadius: radius.md }, eventCoverFallback: { width: 66, height: 66, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, eventBody: { flex: 1, minWidth: 0 }, eventTop: { flexDirection: "row", alignItems: "center", gap: 7 }, eventTitle: { flex: 1, color: colors.onSurface, fontSize: 15, fontWeight: "800" }, eventMeta: { color: colors.muted, fontSize: 12, marginTop: 4 }, eventStatus: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, eventStatusText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
-  circleProfileRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, circleProfileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }, circleIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, shownBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, shownBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" }, privateNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: spacing.md, textAlign: "center" },
+  circleProfileRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, groupSectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 4 }, groupEmpty: { paddingVertical: 14 }, clubThumb: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.surfaceSecondary }, circleProfileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }, circleIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, shownBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, shownBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" }, privateNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: spacing.md, textAlign: "center" },
   postsSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.md }, createPostRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, createPostPrompt: { flex: 1, color: colors.muted, fontSize: 13 }, createPostPlus: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" }, postCard: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.divider }, postHead: { flexDirection: "row", alignItems: "center", gap: 10 }, postName: { color: colors.onSurface, fontSize: 14, fontWeight: "800" }, postMeta: { color: colors.muted, fontSize: 11, marginTop: 2 }, postText: { color: colors.onSurface, fontSize: 15, lineHeight: 21, marginTop: 11 }, postActions: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 11 }, postActionText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" },
   plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
