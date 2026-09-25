@@ -8,7 +8,6 @@ import { colors, spacing, radius } from "@/src/theme";
 import { Avatar, Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
-import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function Profile() {
   const { user, refresh, signOut } = useAuth();
@@ -36,7 +35,7 @@ export default function Profile() {
     if (!res.canceled && res.assets[0]) {
       try {
         const up = await api.uploadImage(res.assets[0].uri);
-        await api.saveOnboarding({ banner_image_url: up.url });
+        await api.updateProfile({ banner_image_url: up.url });
         await refresh();
       } catch {}
     }
@@ -64,7 +63,7 @@ export default function Profile() {
     if (!res.canceled && res.assets[0]) {
       try {
         const up = await api.uploadImage(res.assets[0].uri);
-        await api.saveOnboarding({ profile_photo_url: up.url });
+        await api.updateProfile({ profile_photo_url: up.url });
         await refresh();
       } catch {}
     }
@@ -104,7 +103,7 @@ export default function Profile() {
             <Text style={styles.meta}>{user.university || "Student"}</Text>
             <Text style={styles.meta}>{[user.major, user.year].filter(Boolean).join(" · ") || "Complete your profile"}</Text>
           </View>
-          <Pressable style={styles.editButton}><Text style={styles.editText}>Edit profile</Text></Pressable>
+          <Pressable style={styles.editButton} onPress={() => router.push("/edit-profile")} testID="edit-profile"><Text style={styles.editText}>Edit profile</Text></Pressable>
         </View>
 
         {!user.verified && (
