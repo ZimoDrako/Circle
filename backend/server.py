@@ -927,6 +927,54 @@ async def list_circles(
     return {"circles": circles}
 
 
+@api.get("/users/{user_id}/circles")
+async def user_profile_circles(user_id: str, user: dict = Depends(current_user)):
+    result = (
+        supabase.table("circles")
+        .select("*")
+        .contains("member_ids", [user_id])
+        .contains("profile_visible_member_ids", [user_id])
+        .neq("type", "dm")
+        .neq("type", "daily")
+        .order("created_at", desc=True)
+        .limit(100)
+        .execute()
+    )
+    circles = result.data or []
+    visible = []
+    for circle in circles:
+        if circle.get("verified_only") and not user.get("verified"):
+            continue
+        await decorate_circle(circle, user)
+        visible.append(circle)
+    return {"circles": visible}
+
+
+@api.patch("/circles/{circle_id}/profile-visibility")
+async def set_circle_profile_visibility(
+    circle_id: str,
+    show: bool = Query(...),
+    user: dict = Depends(current_user),
+):
+    result = supabase.table("circles").select("*").eq("id", circle_id).limit(1).execute()
+    circle = result.data[0] if result.data else None
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+    if user["id"] not in (circle.get("member_ids") or []):
+        raise HTTPException(403, "Only Circle members can change profile visibility")
+    if circle.get("type") in ("dm", "daily"):
+        raise HTTPException(403, "Private and Daily Circles cannot be shown on profiles")
+
+    visible_ids = list(circle.get("profile_visible_member_ids") or [])
+    if show and user["id"] not in visible_ids:
+        visible_ids.append(user["id"])
+    elif not show:
+        visible_ids = [uid for uid in visible_ids if uid != user["id"]]
+
+    supabase.table("circles").update({"profile_visible_member_ids": visible_ids}).eq("id", circle_id).execute()
+    return {"ok": True, "show_on_profile": show}
+
+
 @api.get("/lounge")
 async def verified_lounge(user: dict = Depends(current_user)):
     """The private lounge only appears once a student is CSUF Verified. Verified users are auto-joined."""
