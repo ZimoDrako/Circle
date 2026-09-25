@@ -5,12 +5,13 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Avatar, CompatibilityBadge, SectionTitle } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 export default function Home() {
+  const { colors: themeColors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const [matches, setMatches] = useState<any[]>([]);
@@ -91,31 +92,31 @@ export default function Home() {
 
         <View style={styles.feedHeader}>
           <View><Text style={styles.feedKicker}>CAMPUS FEED</Text><Text style={styles.feedTitle}>What's happening</Text></View>
-          <Pressable onPress={() => router.push("/create-post")} style={styles.feedCreate}><Icon name="add" size={21} color={colors.onBrandPrimary} /></Pressable>
+          <Pressable onPress={() => router.push("/create-post")} style={styles.feedCreate}><Icon name="add" size={21} color={themeColors.onBrandPrimary} /></Pressable>
         </View>
         <View style={styles.feedTabs}>
           <Pressable onPress={() => setFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
           <Pressable onPress={() => setFeedMode("connections")} style={[styles.feedTab, feedMode === "connections" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "connections" && styles.feedTabTextActive]}>Connections</Text></Pressable>
         </View>
         <View style={styles.feed}>
-          {posts.length === 0 ? <View style={styles.feedEmpty}><Icon name="chatbubbles-outline" size={28} color={colors.brandPrimary} /><Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text><Text style={styles.feedEmptyText}>Start something. Ask a question, make a plan, or find people who are down.</Text></View> : posts.slice(0, 12).map((post:any) => {
+          {posts.length === 0 ? <View style={styles.feedEmpty}><Icon name="chatbubbles-outline" size={28} color={themeColors.brandPrimary} /><Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text><Text style={styles.feedEmptyText}>Start something. Ask a question, make a plan, or find people who are down.</Text></View> : posts.slice(0, 12).map((post:any) => {
             const actionable = ["anyone_down","looking_for_people"].includes(post.intent);
             return <Pressable key={post.id} onPress={() => router.push(`/post/${post.id}`)} style={styles.feedPost}>
               <Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name} size={42} />
-              <View style={styles.feedPostBody}><View style={styles.feedPostTop}><Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text><Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text></View><Text style={styles.feedPostText}>{post.content}</Text><View style={styles.feedPostActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{actionable && <><Icon name="people-outline" size={16} color={colors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}</View></View>
+              <View style={styles.feedPostBody}><View style={styles.feedPostTop}><Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text><Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text></View><Text style={styles.feedPostText}>{post.content}</Text><View style={styles.feedPostActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{actionable && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}</View></View>
             </Pressable>;
           })}
         </View>
 
         <View style={styles.heroSection}>
           <View style={styles.moveCard}>
-            <View style={styles.moveIcon}><Icon name="sparkles" size={20} color={colors.onBrandPrimary} /></View>
+            <View style={styles.moveIcon}><Icon name="sparkles" size={20} color={themeColors.onBrandPrimary} /></View>
             <Text style={styles.moveKicker}>YOUR DAY, YOUR PEOPLE</Text>
             <Text style={styles.moveTitle}>What's the move?</Text>
             <Text style={styles.moveCopy}>Tell Circle what you're up for today. We'll help find people who want the same thing.</Text>
             <Pressable onPress={() => router.push("/daily-circle")} style={styles.moveButton} testID="whats-the-move">
               <Text style={styles.moveButtonText}>Find my Circle</Text>
-              <Icon name="arrow-forward" size={17} color={colors.onBrandPrimary} />
+              <Icon name="arrow-forward" size={17} color={themeColors.onBrandPrimary} />
             </Pressable>
             <View style={styles.moveVibes}>
               {["Food", "Chill", "Study", "Active", "Explore"].map((v) => <View key={v} style={styles.vibePill}><Text style={styles.vibeText}>{v}</Text></View>)}
@@ -125,13 +126,13 @@ export default function Home() {
 
         {reminders.map((r) => (
           <Pressable key={r.id} testID={`reminder-${r.id}`} onPress={() => router.push(`/event/${r.id}`)} style={styles.reminder}>
-            <View style={styles.reminderIcon}><Icon name="alarm" size={20} color={colors.onBrandPrimary} /></View>
+            <View style={styles.reminderIcon}><Icon name="alarm" size={20} color={themeColors.onBrandPrimary} /></View>
             <View style={{ flex: 1, marginLeft: spacing.md }}>
               <Text style={styles.reminderTitle}>Starts in {fmtMins(r.starts_in_minutes)} · {r.title}</Text>
               <Text style={styles.reminderMeta} numberOfLines={1}>{`${r.time} at ${r.location} — you're ${r.my_status === "going" ? "going" : "interested"} 🙌`}</Text>
             </View>
             <Pressable onPress={() => dismissReminder(r.id)} hitSlop={8} testID={`reminder-dismiss-${r.id}`}>
-              <Icon name="close" size={18} color={colors.onBrandPrimary} />
+              <Icon name="close" size={18} color={themeColors.onBrandPrimary} />
             </Pressable>
           </Pressable>
         ))}
@@ -145,7 +146,7 @@ export default function Home() {
                   <Text style={styles.digestTitle}>{digest.headline}</Text>
                   <Text style={styles.digestMeta}>{digest.total_events} events Fri–Sun · tap to plan ahead</Text>
                 </View>
-                <Icon name="arrow-forward-circle" size={32} color={colors.brandPrimary} />
+                <Icon name="arrow-forward-circle" size={32} color={themeColors.brandPrimary} />
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, marginTop: spacing.md }}>
                 {digestEvents.slice(0, 6).map((e: any) => (
