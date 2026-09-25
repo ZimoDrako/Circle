@@ -53,7 +53,7 @@ export const api = {
   getUserConnections: (id: string) => req(`/users/${id}/connections`),
   listUsers: (q?: string) => req(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
 
-  listPosts: (userId?: string) => req(`/posts${userId ? `?user_id=${encodeURIComponent(userId)}` : ""}`),
+  listPosts: (userId?: string, feed: "for_you" | "connections" = "for_you") => req(`/posts?feed=${feed}${userId ? `&user_id=${encodeURIComponent(userId)}` : ""}`),
   createPost: (body: any) => req("/posts", { method: "POST", body: JSON.stringify(body) }),
   deletePost: (id: string) => req(`/posts/${id}`, { method: "DELETE" }),
   togglePostInterest: (id: string) => req(`/posts/${id}/interest`, { method: "POST" }),
