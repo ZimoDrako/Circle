@@ -78,7 +78,7 @@ export default function Home() {
           </View>
           <View style={styles.headerActions}>
             <Pressable onPress={() => router.push("/activity")} style={styles.bellButton} testID="home-activity">
-              <Icon name="notifications-outline" size={23} color={colors.onSurface} />
+              <Icon name="notifications-outline" size={23} color={themeColors.onSurface} />
               {unreadCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
@@ -104,7 +104,7 @@ export default function Home() {
             const actionable = ["anyone_down","looking_for_people"].includes(post.intent);
             return <Pressable key={post.id} onPress={() => router.push(`/post/${post.id}`)} style={styles.feedPost}>
               <Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name} size={42} />
-              <View style={styles.feedPostBody}><View style={styles.feedPostTop}><Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text><Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text></View><Text style={styles.feedPostText}>{post.content}</Text><View style={styles.feedPostActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{actionable && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}</View></View>
+              <View style={styles.feedPostBody}><View style={styles.feedPostTop}><Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text><Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text></View><Text style={styles.feedPostText}>{post.content}</Text><View style={styles.feedPostActions}><Icon name="chatbubble-outline" size={15} color={themeColors.muted} />{actionable && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}</View></View>
             </Pressable>;
           })}
         </View>
@@ -212,7 +212,7 @@ export default function Home() {
                   <Text style={styles.circleName}>{c.name}</Text>
                   <Text style={styles.circleMeta}>{c.member_ids.length} members · {c.interests.slice(0, 3).join(" · ")}</Text>
                 </View>
-                <Icon name="chevron-forward" size={20} color={colors.muted} />
+                <Icon name="chevron-forward" size={20} color={themeColors.muted} />
               </Pressable>
             ))}
           </View>
