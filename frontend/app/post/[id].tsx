@@ -10,7 +10,7 @@ import { useAuth } from "@/src/auth";
 
 export default function PostDetail(){
   const { colors: themeColors } = useTheme();
-  const styles = useStyles();
+  const s = useStyles();
  const {id}=useLocalSearchParams<{id:string}>(); const router=useRouter(); const {user}=useAuth();
  const [post,setPost]=useState<any>(null); const [replies,setReplies]=useState<any[]>([]); const [text,setText]=useState(""); const [busy,setBusy]=useState(false);
  const load=useCallback(async()=>{try{const [p,r]=await Promise.all([api.listPosts(),api.listPostReplies(id!)]);setPost((p.posts||[]).find((x:any)=>x.id===id));setReplies(r.replies||[])}catch{}},[id]);
