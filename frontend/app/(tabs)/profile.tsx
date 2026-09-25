@@ -17,6 +17,7 @@ export default function Profile() {
   const [myCircles, setMyCircles] = useState<any[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [interestsOpen, setInterestsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<"about" | "events" | "posts" | "circles">("about");
@@ -24,8 +25,9 @@ export default function Profile() {
   useFocusEffect(useCallback(() => {
     (async () => {
       try {
-        const [circles, conns, eventData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents()]);
+        const [circles, conns, eventData, postData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents(), api.listPosts(user.id)]);
         setEvents(eventData.events || []);
+        setPosts(postData.posts || []);
         const mine = (circles.circles || []).filter((c: any) => c.type !== "dm");
         setMyCircles(mine);
         setCircleCount(mine.length);
@@ -172,7 +174,13 @@ export default function Profile() {
             </Pressable>;
           })}
         </View>}
-        {profileTab === "posts" && <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Posts</Text><Text style={styles.tabEmptyText}>Share plans, questions, photos, and campus moments that help people connect.</Text></View>}
+        {profileTab === "posts" && <View style={styles.postsSection}>
+          <Pressable style={styles.createPostRow} onPress={() => router.push("/create-post")}><Avatar uri={user.profile_photo_url} name={user.first_name} size={38} /><Text style={styles.createPostPrompt}>Start a conversation or make a plan...</Text><View style={styles.createPostPlus}><Icon name="add" size={20} color={colors.onBrandPrimary} /></View></Pressable>
+          {posts.length === 0 ? <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No posts yet</Text><Text style={styles.tabEmptyText}>Ask a question, find people for a plan, or share what's happening around campus.</Text></View> : posts.map((post:any) => <View key={post.id} style={styles.postCard}>
+            <View style={styles.postHead}><Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name || user.first_name} size={38} /><View style={{flex:1}}><Text style={styles.postName}>{post.author?.first_name || user.first_name} {post.author?.last_name || user.last_name}</Text><Text style={styles.postMeta}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : "Post"} · {post.audience === "connections" ? "Connections" : "Campus"}</Text></View><Pressable onPress={() => Alert.alert("Delete post?", "This cannot be undone.", [{text:"Cancel",style:"cancel"},{text:"Delete",style:"destructive",onPress:async()=>{await api.deletePost(post.id);setPosts((p)=>p.filter((x:any)=>x.id!==post.id));}}])}><Icon name="ellipsis-horizontal" size={20} color={colors.muted} /></Pressable></View>
+            <Text style={styles.postText}>{post.content}</Text>
+          </View>)}
+        </View>}
         {profileTab === "circles" && <View style={styles.eventsSection}>
           {myCircles.filter((circle: any) => circle.type !== "daily").length === 0 ? <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No public Circles yet</Text><Text style={styles.tabEmptyText}>Community, hobby, and school Circles can be shown here. Daily Circles and DMs always stay private.</Text></View> : myCircles.filter((circle: any) => circle.type !== "daily").map((circle: any) => {
             const shown = (circle.profile_visible_member_ids || []).includes(user.id);
@@ -232,6 +240,7 @@ const styles = StyleSheet.create({
   profileTabs: { marginTop: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider, flexDirection: "row", paddingHorizontal: spacing.xl }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { fontSize: 13, fontWeight: "700", color: colors.muted }, profileTabTextActive: { color: colors.brandPrimary, fontWeight: "900" }, profileTabLine: { position: "absolute", bottom: -1, height: 3, width: 34, borderRadius: 2, backgroundColor: colors.brandPrimary }, tabEmpty: { alignItems: "center", paddingHorizontal: 42, paddingVertical: 52 }, tabEmptyTitle: { fontSize: 18, fontWeight: "900", color: colors.onSurface, marginTop: 10 }, tabEmptyText: { fontSize: 13, lineHeight: 19, textAlign: "center", color: colors.muted, marginTop: 6 },
   eventsSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.md }, eventCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, eventCover: { width: 66, height: 66, borderRadius: radius.md }, eventCoverFallback: { width: 66, height: 66, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, eventBody: { flex: 1, minWidth: 0 }, eventTop: { flexDirection: "row", alignItems: "center", gap: 7 }, eventTitle: { flex: 1, color: colors.onSurface, fontSize: 15, fontWeight: "800" }, eventMeta: { color: colors.muted, fontSize: 12, marginTop: 4 }, eventStatus: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, eventStatusText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
   circleProfileRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, circleProfileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }, circleIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, shownBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, shownBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" }, privateNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: spacing.md, textAlign: "center" },
+  postsSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.md }, createPostRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, createPostPrompt: { flex: 1, color: colors.muted, fontSize: 13 }, createPostPlus: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" }, postCard: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.divider }, postHead: { flexDirection: "row", alignItems: "center", gap: 10 }, postName: { color: colors.onSurface, fontSize: 14, fontWeight: "800" }, postMeta: { color: colors.muted, fontSize: 11, marginTop: 2 }, postText: { color: colors.onSurface, fontSize: 15, lineHeight: 21, marginTop: 11 },
   plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
