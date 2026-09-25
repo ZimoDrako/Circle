@@ -4,12 +4,13 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Avatar, Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 export default function Profile() {
+  const { colors: themeColors } = useTheme();
   const { user, refresh } = useAuth();
   const router = useRouter();
   const [verifying, setVerifying] = useState(false);
@@ -97,17 +98,17 @@ export default function Profile() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Pressable style={styles.banner} onPress={changeBanner} testID="profile-banner">
-            {user.banner_image_url ? <Image source={{ uri: user.banner_image_url }} style={styles.bannerImage} /> : <View style={styles.bannerFallback}><Icon name="image-outline" size={26} color={colors.brandPrimary} /><Text style={styles.bannerHint}>Add a banner</Text></View>}
+            {user.banner_image_url ? <Image source={{ uri: user.banner_image_url }} style={styles.bannerImage} /> : <View style={styles.bannerFallback}><Icon name="image-outline" size={26} color={themeColors.brandPrimary} /><Text style={styles.bannerHint}>Add a banner</Text></View>}
             <View style={styles.bannerEdit}><Icon name="camera" size={14} color="#FFF" /><Text style={styles.bannerEditText}>Edit</Text></View>
           </Pressable>
           <Pressable onPress={changePhoto} style={styles.avatarWrap} testID="profile-photo">
             <Avatar uri={user.profile_photo_url ?? null} name={user.first_name} size={104} />
-            <View style={styles.cameraBadge}><Icon name="camera" size={15} color={colors.onBrandPrimary} /></View>
+            <View style={styles.cameraBadge}><Icon name="camera" size={15} color={themeColors.onBrandPrimary} /></View>
           </Pressable>
           <View style={styles.identity}>
             <View style={styles.nameRow}>
               <Text style={styles.name}>{user.first_name} {user.last_name}</Text>
-              {user.verified && <Icon name="checkmark-circle" size={20} color={colors.brandPrimary} />}
+              {user.verified && <Icon name="checkmark-circle" size={20} color={themeColors.brandPrimary} />}
             </View>
             <Text style={styles.meta}>{user.university || "Student"}</Text>
             <Text style={styles.meta}>{[user.major, user.year].filter(Boolean).join(" · ") || "Complete your profile"}</Text>
@@ -118,7 +119,7 @@ export default function Profile() {
 
         {!user.verified && (
           <Pressable onPress={verify} testID="verify-student" style={styles.verifyCard}>
-            <Icon name="shield-checkmark-outline" size={20} color={colors.brandPrimary} />
+            <Icon name="shield-checkmark-outline" size={20} color={themeColors.brandPrimary} />
             <View style={{ flex: 1 }}><Text style={styles.verifyTitle}>Verify student status</Text><Text style={styles.verifySub}>Unlock verified campus spaces</Text></View>
             <Text style={styles.verifyAction}>{verifying ? "..." : "Verify"}</Text>
           </Pressable>
@@ -149,13 +150,13 @@ export default function Profile() {
         <Pressable style={styles.plainSection} onPress={() => setInterestsOpen(true)}>
           <View style={styles.cardHeader}>
             <View><Text style={styles.cardTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View>
-            <Icon name="chevron-forward" size={20} color={colors.brandPrimary} />
+            <Icon name="chevron-forward" size={20} color={themeColors.brandPrimary} />
           </View>
-          <View style={styles.previewRow}>{preview.map((i: string) => <View key={i} style={styles.previewTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text></View>)}{(user.interests?.length || 0) > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{user.interests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
+          <View style={styles.previewRow}>{preview.map((i: string) => <View key={i} style={styles.previewTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={themeColors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text></View>)}{(user.interests?.length || 0) > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{user.interests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
         </Pressable>
 
         <View style={styles.plainSection}>
-          <View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View>
+          <View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={themeColors.brandPrimary} /></View>
           {(user.looking_for || []).length ? <View style={styles.lookingWrap}>{(user.looking_for || []).map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View> : <Text style={styles.bio}>Add what you're looking for</Text>}
         </View>
 
@@ -163,10 +164,10 @@ export default function Profile() {
         </>}
 
         {profileTab === "events" && <View style={styles.eventsSection}>
-          {profileEvents.length === 0 ? <View style={styles.tabEmpty}><Icon name="calendar-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No events yet</Text><Text style={styles.tabEmptyText}>Events you create, attend, or show interest in will appear here.</Text></View> : profileEvents.map((event: any) => {
+          {profileEvents.length === 0 ? <View style={styles.tabEmpty}><Icon name="calendar-outline" size={30} color={themeColors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No events yet</Text><Text style={styles.tabEmptyText}>Events you create, attend, or show interest in will appear here.</Text></View> : profileEvents.map((event: any) => {
             const status = event.creator_id === user.id ? "Created" : event.my_status === "going" ? "Going" : "Interested";
             return <Pressable key={event.id} style={styles.eventCard} onPress={() => router.push(`/event/${event.id}`)}>
-              {event.cover_image_url ? <Image source={{ uri: event.cover_image_url }} style={styles.eventCover} /> : <View style={styles.eventCoverFallback}><Icon name="calendar" size={24} color={colors.brandPrimary} /></View>}
+              {event.cover_image_url ? <Image source={{ uri: event.cover_image_url }} style={styles.eventCover} /> : <View style={styles.eventCoverFallback}><Icon name="calendar" size={24} color={themeColors.brandPrimary} /></View>}
               <View style={styles.eventBody}><View style={styles.eventTop}><Text numberOfLines={1} style={styles.eventTitle}>{event.title}</Text><View style={styles.eventStatus}><Text style={styles.eventStatusText}>{status}</Text></View></View>
               <Text style={styles.eventMeta}>{[event.date, event.time].filter(Boolean).join(" · ")}</Text>
               {!!event.location && <Text numberOfLines={1} style={styles.eventMeta}>{event.location}</Text>}</View>
@@ -175,20 +176,20 @@ export default function Profile() {
           })}
         </View>}
         {profileTab === "posts" && <View style={styles.postsSection}>
-          <Pressable style={styles.createPostRow} onPress={() => router.push("/create-post")}><Avatar uri={user.profile_photo_url} name={user.first_name} size={38} /><Text style={styles.createPostPrompt}>Start a conversation or make a plan...</Text><View style={styles.createPostPlus}><Icon name="add" size={20} color={colors.onBrandPrimary} /></View></Pressable>
-          {posts.length === 0 ? <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No posts yet</Text><Text style={styles.tabEmptyText}>Ask a question, find people for a plan, or share what's happening around campus.</Text></View> : posts.map((post:any) => <Pressable key={post.id} style={styles.postCard} onPress={() => router.push(`/post/${post.id}`)}>
+          <Pressable style={styles.createPostRow} onPress={() => router.push("/create-post")}><Avatar uri={user.profile_photo_url} name={user.first_name} size={38} /><Text style={styles.createPostPrompt}>Start a conversation or make a plan...</Text><View style={styles.createPostPlus}><Icon name="add" size={20} color={themeColors.onBrandPrimary} /></View></Pressable>
+          {posts.length === 0 ? <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={themeColors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No posts yet</Text><Text style={styles.tabEmptyText}>Ask a question, find people for a plan, or share what's happening around campus.</Text></View> : posts.map((post:any) => <Pressable key={post.id} style={styles.postCard} onPress={() => router.push(`/post/${post.id}`)}>
             <View style={styles.postHead}><Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name || user.first_name} size={38} /><View style={{flex:1}}><Text style={styles.postName}>{post.author?.first_name || user.first_name} {post.author?.last_name || user.last_name}</Text><Text style={styles.postMeta}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : "Post"} · {post.audience === "connections" ? "Connections" : "Campus"}</Text></View><Pressable onPress={() => Alert.alert("Delete post?", "This cannot be undone.", [{text:"Cancel",style:"cancel"},{text:"Delete",style:"destructive",onPress:async()=>{await api.deletePost(post.id);setPosts((p)=>p.filter((x:any)=>x.id!==post.id));}}])}><Icon name="ellipsis-horizontal" size={20} color={colors.muted} /></Pressable></View>
             <Text style={styles.postText}>{post.content}</Text>
-            <View style={styles.postActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{["anyone_down","looking_for_people"].includes(post.intent) && <><Icon name="people-outline" size={16} color={colors.brandPrimary} /><Text style={styles.postActionText}>{post.interest_count || 0} down</Text></>}</View>
+            <View style={styles.postActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{["anyone_down","looking_for_people"].includes(post.intent) && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.postActionText}>{post.interest_count || 0} down</Text></>}</View>
           </Pressable>)}
         </View>}
         {profileTab === "circles" && <View style={styles.eventsSection}>
-          {myCircles.filter((circle: any) => circle.type !== "daily").length === 0 ? <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No public Circles yet</Text><Text style={styles.tabEmptyText}>Community, hobby, and school Circles can be shown here. Daily Circles and DMs always stay private.</Text></View> : myCircles.filter((circle: any) => circle.type !== "daily").map((circle: any) => {
+          {myCircles.filter((circle: any) => circle.type !== "daily").length === 0 ? <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={themeColors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No public Circles yet</Text><Text style={styles.tabEmptyText}>Community, hobby, and school Circles can be shown here. Daily Circles and DMs always stay private.</Text></View> : myCircles.filter((circle: any) => circle.type !== "daily").map((circle: any) => {
             const shown = (circle.profile_visible_member_ids || []).includes(user.id);
             return <Pressable key={circle.id} style={styles.circleProfileRow} onPress={() => router.push(`/circle/${circle.id}`)}>
-              <View style={styles.circleIcon}><Icon name="people" size={22} color={colors.brandPrimary} /></View>
+              <View style={styles.circleIcon}><Icon name="people" size={22} color={themeColors.brandPrimary} /></View>
               <View style={{ flex: 1 }}><Text style={styles.eventTitle}>{circle.name}</Text><Text numberOfLines={1} style={styles.eventMeta}>{(circle.interests || []).slice(0, 3).join(" · ") || `${(circle.member_ids || []).length} members`}</Text></View>
-              {shown && <View style={styles.shownBadge}><Icon name="eye" size={13} color={colors.brandPrimary} /><Text style={styles.shownBadgeText}>On profile</Text></View>}
+              {shown && <View style={styles.shownBadge}><Icon name="eye" size={13} color={themeColors.brandPrimary} /><Text style={styles.shownBadgeText}>On profile</Text></View>}
               <Icon name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>;
           })}
@@ -215,7 +216,7 @@ export default function Profile() {
       <Modal visible={interestsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setInterestsOpen(false)}>
         <SafeAreaView style={styles.modalRoot}>
           <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View><Pressable onPress={() => setInterestsOpen(false)}><Icon name="close" size={26} color={colors.onSurface} /></Pressable></View>
-          <ScrollView contentContainerStyle={styles.modalContent}><View style={styles.modalInterestGrid}>{(user.interests || []).map((i: string) => <View key={i} style={styles.modalInterestTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={colors.brandPrimary} /></View><Text numberOfLines={2} style={styles.modalInterestName}>{i}</Text></View>)}</View></ScrollView>
+          <ScrollView contentContainerStyle={styles.modalContent}><View style={styles.modalInterestGrid}>{(user.interests || []).map((i: string) => <View key={i} style={styles.modalInterestTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={themeColors.brandPrimary} /></View><Text numberOfLines={2} style={styles.modalInterestName}>{i}</Text></View>)}</View></ScrollView>
         </SafeAreaView>
       </Modal>
     </View>
