@@ -5,13 +5,14 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar, CompatibilityBadge, SectionTitle } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 export default function Home() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const { user } = useAuth();
   const router = useRouter();
   const [matches, setMatches] = useState<any[]>([]);
@@ -237,7 +238,7 @@ export default function Home() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.xl, paddingBottom: 0 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
@@ -295,4 +296,4 @@ const styles = StyleSheet.create({
   digestChipDay: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   digestChipTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "700", marginTop: 2 },
   digestChipVibe: { color: colors.muted, fontSize: 10, marginTop: 2 },
-});
+}));
