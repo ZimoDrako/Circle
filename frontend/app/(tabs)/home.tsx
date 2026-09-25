@@ -126,64 +126,6 @@ export default function Home() {
           )}
         </View>
       </ScrollView>
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle title="People you might vibe with" action="See all" onAction={() => router.push("/(tabs)/discover")} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingRight: spacing.xl }}>
-            {matches.slice(0, 8).map((m) => (
-              <Pressable key={m.user.id} testID={`home-match-${m.user.id}`} onPress={() => router.push(`/match/${m.user.id}`)} style={styles.matchCard}>
-                <Avatar uri={m.user.profile_photo_url} name={m.user.first_name} size={64} />
-                <View style={{ marginTop: spacing.sm, alignItems: "center" }}>
-                  <Text style={styles.matchName}>{m.user.first_name}</Text>
-                  <Text style={styles.matchMeta}>{m.user.major || m.user.year}</Text>
-                  <View style={{ height: spacing.xs }} />
-                  <CompatibilityBadge score={m.compatibility} />
-                </View>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {circles.length > 0 && (
-          <View style={styles.section}>
-            <SectionTitle title="Your Circles" action="See all" onAction={() => router.push("/(tabs)/circles")} />
-            {circles.slice(0, 3).map((c) => (
-              <Pressable key={c.id} onPress={() => router.push(`/circle/${c.id}`)} style={styles.circleRow}>
-                <View style={styles.avatarStack}>
-                  {c.members.slice(0, 3).map((m: any, i: number) => (
-                    <View key={m.id} style={{ marginLeft: i === 0 ? 0 : -12 }}>
-                      <Avatar uri={m.profile_photo_url} name={m.first_name} size={36} />
-                    </View>
-                  ))}
-                </View>
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={styles.circleName}>{c.name}</Text>
-                  <Text style={styles.circleMeta}>{c.member_ids.length} members · {c.interests.slice(0, 3).join(" · ")}</Text>
-                </View>
-                <Icon name="chevron-forward" size={20} color={themeColors.muted} />
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {recs.length > 0 && (
-          <View style={styles.section}>
-            <SectionTitle title="Try something new" />
-            {recs.slice(0, 3).map((r) => (
-              <Pressable key={r.id} onPress={() => router.push(`/recommendation/${r.id}`)} style={styles.recRow}>
-                <Image source={{ uri: r.image_url }} style={styles.recImg} contentFit="cover" />
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={styles.recCat}>{r.category.toUpperCase()}</Text>
-                  <Text numberOfLines={2} style={styles.recTitle}>{r.title}</Text>
-                  <Text numberOfLines={1} style={styles.recCreator}>by {r.creator_name}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
       <Modal visible={createMenuOpen} transparent animationType="fade" onRequestClose={() => setCreateMenuOpen(false)}>
         <Pressable style={styles.createOverlay} onPress={() => setCreateMenuOpen(false)}>
           <View style={styles.createSheet}>
