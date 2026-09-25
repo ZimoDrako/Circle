@@ -5,13 +5,14 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Avatar, CompatibilityBadge, Chip, EmptyState } from "@/src/ui";
 import { api } from "@/src/api";
 
 const TABS = ["Events", "People", "Recommendations", "Clubs"] as const;
 
 export default function Discover() {
+  const { colors: themeColors } = useTheme();
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Events");
   const [q, setQ] = useState("");
@@ -136,7 +137,7 @@ export default function Discover() {
                     onPress={(event) => { event.stopPropagation(); ratePerson(u.id, "interested"); }}
                     style={styles.personInterested}
                   >
-                    <Icon name="sparkles" size={15} color={colors.onBrandPrimary} />
+                    <Icon name="sparkles" size={15} color={themeColors.onBrandPrimary} />
                     <Text style={styles.personInterestedText}>Interested</Text>
                   </Pressable>
                 </View>
