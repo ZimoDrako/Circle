@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { View, Text, ScrollView, Pressable, RefreshControl, Modal } from "react-native";
+import { Image } from "expo-image";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -14,6 +15,8 @@ export default function Home() {
   const { user } = useAuth();
   const router = useRouter();
   const [reminders, setReminders] = useState<any[]>([]);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [posts, setPosts] = useState<any[]>([]);
@@ -23,14 +26,20 @@ export default function Home() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [rem, nt, pf] = await Promise.all([
+      const extras = feedMode === "for_you"
+        ? [api.getMatches(), api.listEvents()]
+        : [Promise.resolve({ matches: [] }), Promise.resolve({ events: [] })];
+      const [rem, nt, pf, m, e] = await Promise.all([
         api.reminders(),
         api.notifications(),
         api.listPosts(undefined, feedMode),
+        ...extras,
       ]);
       setReminders(rem.reminders || []);
       setUnreadCount(nt.unread_count || 0);
       setPosts(pf.posts || []);
+      setMatches((m as any).matches || []);
+      setEvents((e as any).events || []);
     } catch {}
     setRefreshing(false);
   }, [feedMode]);
@@ -43,6 +52,16 @@ export default function Home() {
   };
 
   const fmtMins = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`);
+  const topMatch = matches[0];
+  const interests = ((user as any)?.interests || []).map((x: string) => x.toLowerCase());
+  const rankedEvents = [...events].sort((a: any, b: any) => {
+    const score = (e: any) => {
+      const haystack = [e.title, e.category, e.description].filter(Boolean).join(" ").toLowerCase();
+      return interests.reduce((n: number, interest: string) => n + (haystack.includes(interest) ? 1 : 0), 0);
+    };
+    return score(b) - score(a);
+  });
+  const topEvent = rankedEvents[0];
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
       <ScrollView
@@ -99,7 +118,41 @@ export default function Home() {
                         </View>
                       </View>
                     </Pressable>
-                    {index === 1 && reminders.length > 0 && (() => {
+                    {feedMode === "for_you" && index === 0 && topMatch && (
+                      <Pressable onPress={() => router.push(`/match/${topMatch.user.id}`)} style={styles.personOpportunity} testID="home-person-for-you">
+                        <View style={styles.opportunityTop}>
+                          <Text style={styles.opportunityKicker}>PERSON FOR YOU</Text>
+                          <Text style={styles.matchPercent}>{topMatch.compatibility}% match</Text>
+                        </View>
+                        <View style={styles.personRow}>
+                          <Avatar uri={topMatch.user.profile_photo_url} name={topMatch.user.first_name} size={58} />
+                          <View style={styles.personBody}>
+                            <Text style={styles.personName}>{topMatch.user.first_name} {topMatch.user.last_name}</Text>
+                            <Text numberOfLines={2} style={styles.opportunityReason}>
+                              {(topMatch.reasons || []).slice(0, 2).join(" · ") || [topMatch.user.major, topMatch.user.year].filter(Boolean).join(" · ") || "Someone Circle thinks you may click with"}
+                            </Text>
+                          </View>
+                          <Icon name="arrow-forward" size={20} color={themeColors.brandPrimary} />
+                        </View>
+                      </Pressable>
+                    )}
+                    {feedMode === "for_you" && index === 2 && topEvent && (
+                      <Pressable onPress={() => router.push(`/event/${topEvent.id}`)} style={styles.eventOpportunity} testID="home-event-for-you">
+                        <View style={styles.opportunityTop}>
+                          <Text style={styles.opportunityKicker}>SOMETHING FOR YOU</Text>
+                          <Text style={styles.eventWhen}>{topEvent.time || "Coming up"}</Text>
+                        </View>
+                        <View style={styles.eventOpportunityRow}>
+                          {topEvent.cover_image_url ? <Image source={{ uri: topEvent.cover_image_url }} style={styles.eventThumb} contentFit="cover" /> : <View style={styles.eventThumbFallback}><Icon name="calendar-outline" size={22} color={themeColors.brandPrimary} /></View>}
+                          <View style={styles.eventBody}>
+                            <Text numberOfLines={1} style={styles.eventName}>{topEvent.title}</Text>
+                            <Text numberOfLines={2} style={styles.opportunityReason}>{topEvent.location || topEvent.category || "A campus event picked for you"}</Text>
+                            <Text style={styles.eventAction}>Find people to go with →</Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    )}
+                                        {index === 1 && reminders.length > 0 && (() => {
                       const r = reminders[0];
                       return (
                         <Pressable testID={`reminder-${r.id}`} onPress={() => router.push(`/event/${r.id}`)} style={styles.feedSignal}>
@@ -176,7 +229,24 @@ const useStyles = makeStyles((colors) => ({
   feedPostActions: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 10 },
   feedDown: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" },
 
-  feedSignal: { flexDirection: "row", alignItems: "center", gap: 11, marginVertical: 8, paddingVertical: 13, paddingHorizontal: 12, borderRadius: radius.lg, backgroundColor: colors.brandTertiary },
+  opportunityTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 11 },
+  opportunityKicker: { color: colors.brandPrimary, fontSize: 9, fontWeight: "900", letterSpacing: 1.05 },
+  personOpportunity: { marginVertical: 10, padding: 15, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.divider },
+  personRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  personBody: { flex: 1, minWidth: 0 },
+  personName: { color: colors.onSurface, fontSize: 17, fontWeight: "900" },
+  matchPercent: { color: colors.brandPrimary, fontSize: 12, fontWeight: "900" },
+  opportunityReason: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  eventOpportunity: { marginVertical: 10, padding: 15, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.divider },
+  eventOpportunityRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  eventThumb: { width: 68, height: 68, borderRadius: radius.md, backgroundColor: colors.surfaceTertiary },
+  eventThumbFallback: { width: 68, height: 68, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" },
+  eventBody: { flex: 1, minWidth: 0 },
+  eventName: { color: colors.onSurface, fontSize: 16, fontWeight: "900" },
+  eventWhen: { color: colors.muted, fontSize: 11, fontWeight: "700" },
+  eventAction: { color: colors.brandPrimary, fontSize: 12, fontWeight: "900", marginTop: 7 },
+
+    feedSignal: { flexDirection: "row", alignItems: "center", gap: 11, marginVertical: 8, paddingVertical: 13, paddingHorizontal: 12, borderRadius: radius.lg, backgroundColor: colors.brandTertiary },
   signalIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   signalBody: { flex: 1, minWidth: 0 },
   signalKicker: { color: colors.brandPrimary, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
