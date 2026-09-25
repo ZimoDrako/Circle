@@ -65,7 +65,7 @@ export default function EventDetail() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 200 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 240 }}>
         <View style={styles.heroWrap}>
           <Image source={{ uri: event.cover_image_url }} style={styles.hero} contentFit="cover" />
           <LinearGradient colors={["rgba(0,0,0,0.4)", "transparent", "rgba(9,9,11,0.9)"]} style={StyleSheet.absoluteFill} />
@@ -255,5 +255,5 @@ const useStyles = makeStyles((colors) => ({
   attMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
   attStatus: { color: colors.brandPrimary, fontSize: 11, fontWeight: "600", marginTop: 2 },
   check: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  footer: { position: "absolute", left: 0, right: 0, bottom: 57, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
+  footer: { position: "absolute", left: 0, right: 0, bottom: 82, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
 }));
