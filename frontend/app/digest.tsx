@@ -4,11 +4,13 @@ import { Image } from "expo-image";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { EmptyState } from "@/src/ui";
 import { api } from "@/src/api";
 
 export default function WeekendDigest() {
+ const { colors } = useTheme();
+ const styles = useStyles();
   const router = useRouter();
   const [digest, setDigest] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,7 +96,7 @@ export default function WeekendDigest() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.lg },
   headerTitle: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
@@ -118,4 +120,4 @@ const styles = StyleSheet.create({
   vibeText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "600" },
   star: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", marginLeft: spacing.sm },
   starOn: { backgroundColor: colors.brandPrimary },
-});
+}));
