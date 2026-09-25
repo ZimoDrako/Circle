@@ -13,7 +13,7 @@ export default function Create() {
   const { colors: themeColors } = useTheme();
   const styles = useStyles();
   const router = useRouter();
-  const [mode, setMode] = useState<"pick" | "event" | "rec">("pick");
+  const [mode, setMode] = useState<"pick" | "event" | "rec" | "club">("pick");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Casual");
@@ -46,6 +46,22 @@ export default function Create() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const submitClub = async () => {
+    if (!title.trim() || !description.trim()) {
+      setError("Add a club name and description.");
+      return;
+    }
+    setError(""); setSaving(true);
+    try {
+      const r = await api.createClub({
+        name: title, description, category, tags: [category],
+        image_url: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=900&q=80",
+      });
+      router.replace(`/club/${r.club.id}`);
+    } catch (e: any) { setError(e?.message || "Could not create the club."); }
+    finally { setSaving(false); }
   };
 
   const submitRec = async () => {
@@ -84,6 +100,13 @@ export default function Create() {
             onPress={() => setMode("event")}
           />
           <ChoiceCard
+            testID="create-club"
+            icon="people-circle"
+            title="Create a Club"
+            sub="Build a lasting community with its own member chat."
+            onPress={() => setMode("club")}
+          />
+          <ChoiceCard
             testID="create-rec"
             icon="star"
             title="Recommend Something"
@@ -107,12 +130,12 @@ export default function Create() {
       <SafeAreaView style={styles.root} edges={["top"]}>
         <View style={styles.formHeader}>
           <Pressable onPress={() => setMode("pick")} testID="create-back"><Icon name="chevron-back" size={26} color={colors.onSurface} /></Pressable>
-          <Text style={styles.formTitle}>{mode === "event" ? "New event" : "New recommendation"}</Text>
+          <Text style={styles.formTitle}>{mode === "event" ? "New event" : mode === "club" ? "New club" : "New recommendation"}</Text>
           <View style={{ width: 26 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
-          <Text style={styles.label}>Title</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="Basketball tonight" placeholderTextColor={colors.muted} style={styles.input} testID="create-title" />
+          <Text style={styles.label}>{mode === "club" ? "Club name" : "Title"}</Text>
+          <TextInput value={title} onChangeText={setTitle} placeholder={mode === "club" ? "Photography Club" : "Basketball tonight"} placeholderTextColor={colors.muted} style={styles.input} testID="create-title" />
           <Text style={styles.label}>Description</Text>
           <TextInput value={description} onChangeText={setDescription} placeholder="Details..." placeholderTextColor={colors.muted} style={[styles.input, { minHeight: 90 }]} multiline testID="create-desc" />
           <Text style={styles.label}>Category</Text>
@@ -149,12 +172,14 @@ export default function Create() {
               )}
             </>
           )}
+          {mode !== "club" && <>
           <Text style={styles.label}>Location</Text>
           <TextInput value={location} onChangeText={setLocation} placeholder="Student Rec Center" placeholderTextColor={colors.muted} style={styles.input} testID="create-location" />
+          </>}
         </ScrollView>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.footer}>
-          <Button label={mode === "event" ? "Post event" : "Post recommendation"} onPress={mode === "event" ? submitEvent : submitRec} loading={saving} disabled={!title || !description} testID="create-submit" />
+          <Button label={mode === "event" ? "Post event" : mode === "club" ? "Create club" : "Post recommendation"} onPress={mode === "event" ? submitEvent : mode === "club" ? submitClub : submitRec} loading={saving} disabled={!title || !description} testID="create-submit" />
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
