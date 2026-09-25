@@ -1,12 +1,10 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, ScrollView, Pressable, RefreshControl, Modal } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
-import { Avatar, CompatibilityBadge, SectionTitle } from "@/src/ui";
+import { spacing, radius, useTheme, makeStyles } from "@/src/theme";
+import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
@@ -15,12 +13,7 @@ export default function Home() {
   const styles = useStyles();
   const { user } = useAuth();
   const router = useRouter();
-  const [matches, setMatches] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [circles, setCircles] = useState<any[]>([]);
-  const [recs, setRecs] = useState<any[]>([]);
   const [reminders, setReminders] = useState<any[]>([]);
-  const [digest, setDigest] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [posts, setPosts] = useState<any[]>([]);
@@ -30,22 +23,12 @@ export default function Home() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [m, e, c, r, rem, dg, nt, pf] = await Promise.all([
-        api.getMatches(),
-        api.listEvents(),
-        api.listCircles(true),
-        api.listRecommendations(),
+      const [rem, nt, pf] = await Promise.all([
         api.reminders(),
-        api.weekendDigest(),
         api.notifications(),
         api.listPosts(undefined, feedMode),
       ]);
-      setMatches(m.matches || []);
-      setEvents(e.events || []);
-      setCircles(c.circles || []);
-      setRecs(r.recommendations || []);
       setReminders(rem.reminders || []);
-      setDigest(dg);
       setUnreadCount(nt.unread_count || 0);
       setPosts(pf.posts || []);
     } catch {}
@@ -60,15 +43,11 @@ export default function Home() {
   };
 
   const fmtMins = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`);
-  const digestEvents = (digest?.days || []).flatMap((d: any) => d.events.map((e: any) => ({ ...e, dayLabel: d.label })));
-
-  const today = events.slice(0, 4);
-
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={colors.brandPrimary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={themeColors.brandPrimary} />}
       >
         <View style={styles.header}>
           <Pressable onPress={() => router.push("/(tabs)/profile")} style={styles.profileShortcut} testID="home-profile">
@@ -85,78 +64,68 @@ export default function Home() {
           </Pressable>
         </View>
 
-        <View style={styles.feedHeader}>
-          <View><Text style={styles.feedKicker}>CAMPUS FEED</Text><Text style={styles.feedTitle}>What's happening</Text></View>
-          <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.feedCreate} testID="home-create-menu"><Icon name="add" size={27} color={themeColors.onSurface} /></Pressable>
-        </View>
         <View style={styles.feedTabs}>
-          <Pressable onPress={() => setFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
-          <Pressable onPress={() => setFeedMode("connections")} style={[styles.feedTab, feedMode === "connections" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "connections" && styles.feedTabTextActive]}>Connections</Text></Pressable>
+          <View style={styles.feedTabGroup}>
+            <Pressable onPress={() => setFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
+            <Pressable onPress={() => setFeedMode("connections")} style={[styles.feedTab, feedMode === "connections" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "connections" && styles.feedTabTextActive]}>Connections</Text></Pressable>
+          </View>
+          <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.feedCreate} testID="home-create-menu"><Icon name="add" size={26} color={themeColors.onSurface} /></Pressable>
         </View>
         <View style={styles.feed}>
-          {posts.length === 0 ? <View style={styles.feedEmpty}><Icon name="chatbubbles-outline" size={28} color={themeColors.brandPrimary} /><Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text><Text style={styles.feedEmptyText}>Start something. Ask a question, make a plan, or find people who are down.</Text></View> : posts.map((post:any) => {
-            const actionable = ["anyone_down","looking_for_people"].includes(post.intent);
-            return <Pressable key={post.id} onPress={() => router.push(`/post/${post.id}`)} style={styles.feedPost}>
-              <Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name} size={42} />
-              <View style={styles.feedPostBody}><View style={styles.feedPostTop}><Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text><Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text></View><Text style={styles.feedPostText}>{post.content}</Text><View style={styles.feedPostActions}><Icon name="chatbubble-outline" size={15} color={themeColors.muted} />{actionable && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}</View></View>
-            </Pressable>;
-          })}
-        </View>
-
-        {reminders.map((r) => (
-          <Pressable key={r.id} testID={`reminder-${r.id}`} onPress={() => router.push(`/event/${r.id}`)} style={styles.reminder}>
-            <View style={styles.reminderIcon}><Icon name="alarm" size={20} color={themeColors.onBrandPrimary} /></View>
-            <View style={{ flex: 1, marginLeft: spacing.md }}>
-              <Text style={styles.reminderTitle}>Starts in {fmtMins(r.starts_in_minutes)} · {r.title}</Text>
-              <Text style={styles.reminderMeta} numberOfLines={1}>{`${r.time} at ${r.location} — you're ${r.my_status === "going" ? "going" : "interested"} 🙌`}</Text>
+          {posts.length === 0 ? (
+            <View style={styles.feedEmpty}>
+              <Icon name="chatbubbles-outline" size={30} color={themeColors.brandPrimary} />
+              <Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text>
+              <Text style={styles.feedEmptyText}>Start something, make a plan, or find people who are down.</Text>
+              <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.emptyAction}><Text style={styles.emptyActionText}>Start something</Text></Pressable>
             </View>
-            <Pressable onPress={() => dismissReminder(r.id)} hitSlop={8} testID={`reminder-dismiss-${r.id}`}>
-              <Icon name="close" size={18} color={themeColors.onBrandPrimary} />
-            </Pressable>
-          </Pressable>
-        ))}
-
-        {digest && digest.total_events > 0 && (
-          <View style={styles.weekendSection}>
-            <View style={styles.weekendHeader}>
-              <View>
-                <Text style={styles.weekendKicker}>THIS WEEKEND</Text>
-                <Text style={styles.weekendTitle}>{digest.weekend_label}</Text>
-              </View>
-              <Pressable onPress={() => router.push("/digest")} testID="weekend-digest">
-                <Text style={styles.weekendSee}>See weekend →</Text>
-              </Pressable>
-            </View>
-            <View style={styles.weekendList}>
-              {digestEvents.slice(0, 3).map((e: any) => (
-                <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={styles.weekendEvent}>
-                  <View style={styles.weekendDay}><Text style={styles.weekendDayText}>{e.dayLabel.slice(0, 3).toUpperCase()}</Text></View>
-                  <View style={styles.weekendEventBody}>
-                    <Text numberOfLines={1} style={styles.weekendEventTitle}>{e.title}</Text>
-                    <Text style={styles.weekendEventMeta}>{e.time}{e.vibe_count > 0 ? ` · ${e.vibe_count} you vibe with going` : ""}</Text>
+          ) : (
+            <>
+              {posts.map((post:any, index:number) => {
+                const actionable = ["anyone_down","looking_for_people"].includes(post.intent);
+                return (
+                  <View key={post.id}>
+                    <Pressable onPress={() => router.push(`/post/${post.id}`)} style={styles.feedPost}>
+                      <Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name} size={42} />
+                      <View style={styles.feedPostBody}>
+                        <View style={styles.feedPostTop}>
+                          <Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text>
+                          <Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text>
+                        </View>
+                        <Text style={styles.feedPostText}>{post.content}</Text>
+                        <View style={styles.feedPostActions}>
+                          <Icon name="chatbubble-outline" size={15} color={themeColors.muted} />
+                          {actionable && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}
+                        </View>
+                      </View>
+                    </Pressable>
+                    {index === 1 && reminders.length > 0 && (() => {
+                      const r = reminders[0];
+                      return (
+                        <Pressable testID={`reminder-${r.id}`} onPress={() => router.push(`/event/${r.id}`)} style={styles.feedSignal}>
+                          <View style={styles.signalIcon}><Icon name="time-outline" size={19} color={themeColors.brandPrimary} /></View>
+                          <View style={styles.signalBody}>
+                            <Text style={styles.signalKicker}>COMING UP</Text>
+                            <Text style={styles.signalTitle}>Starts in {fmtMins(r.starts_in_minutes)} · {r.title}</Text>
+                            <Text numberOfLines={1} style={styles.signalMeta}>{r.time} · {r.location}</Text>
+                          </View>
+                          <Pressable onPress={() => dismissReminder(r.id)} hitSlop={10}><Icon name="close" size={17} color={themeColors.muted} /></Pressable>
+                        </Pressable>
+                      );
+                    })()}
                   </View>
-                  <Icon name="chevron-forward" size={18} color={themeColors.muted} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <SectionTitle title="Happening today" action="See all" onAction={() => router.push("/(tabs)/discover")} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingRight: spacing.xl }}>
-            {today.map((e) => (
-              <Pressable key={e.id} testID={`home-event-${e.id}`} onPress={() => router.push(`/event/${e.id}`)} style={styles.eventCard}>
-                <Image source={{ uri: e.cover_image_url }} style={styles.eventImg} contentFit="cover" />
-                <LinearGradient colors={["transparent", "rgba(9,9,11,0.85)"]} style={styles.eventScrim} />
-                <View style={styles.eventBody}>
-                  <Text style={styles.eventCat}>{e.category.toUpperCase()}</Text>
-                  <Text numberOfLines={2} style={styles.eventTitle}>{e.title}</Text>
-                  <Text style={styles.eventMeta}>{e.time} · {e.interested_count || 0} interested</Text>
-                </View>
-              </Pressable>
-            ))}
-          </ScrollView>
+                );
+              })}
+              <View style={styles.caughtUp}>
+                <View style={styles.caughtIcon}><Icon name="checkmark" size={18} color={themeColors.brandPrimary} /></View>
+                <Text style={styles.caughtTitle}>You're caught up</Text>
+                <Text style={styles.caughtText}>See what else is happening around campus.</Text>
+                <Pressable onPress={() => router.push("/(tabs)/discover")}><Text style={styles.exploreLink}>Explore campus →</Text></Pressable>
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
         </View>
 
         <View style={styles.section}>
@@ -246,47 +215,44 @@ const useStyles = makeStyles((colors) => ({
   bellButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   notificationBadge: { position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.error, borderWidth: 2, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   notificationBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", lineHeight: 11 },
-  feedHeader: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  feedKicker: { fontSize: 10, fontWeight: "900", letterSpacing: 1.1, color: colors.brandPrimary }, feedTitle: { fontSize: 23, fontWeight: "900", color: colors.onSurface, marginTop: 2 },
-  feedCreate: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  feedTabs: { marginHorizontal: spacing.xl, marginTop: spacing.md, flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.divider }, feedTab: { paddingVertical: 10, marginRight: 24 }, feedTabActive: { borderBottomWidth: 2, borderBottomColor: colors.brandPrimary }, feedTabText: { color: colors.muted, fontSize: 13, fontWeight: "700" }, feedTabTextActive: { color: colors.onSurface, fontWeight: "900" },
-  feed: { paddingHorizontal: spacing.xl, minHeight: 360 }, feedPost: { flexDirection: "row", gap: 10, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.divider }, feedPostBody: { flex: 1 }, feedPostTop: { flexDirection: "row", alignItems: "center", gap: 7 }, feedPostName: { flexShrink: 1, color: colors.onSurface, fontSize: 14, fontWeight: "900" }, feedPostIntent: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" }, feedPostText: { color: colors.onSurface, fontSize: 15, lineHeight: 21, marginTop: 6 }, feedPostActions: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 9 }, feedDown: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" }, feedEmpty: { alignItems: "center", paddingVertical: 32, paddingHorizontal: 28 }, feedEmptyTitle: { color: colors.onSurface, fontSize: 16, fontWeight: "900", marginTop: 8 }, feedEmptyText: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
-  section: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
-  eventCard: { width: 240, height: 160, borderRadius: radius.lg, overflow: "hidden", backgroundColor: colors.surfaceSecondary },
-  eventImg: { ...StyleSheet.absoluteFill },
-  eventScrim: { ...StyleSheet.absoluteFill },
-  eventBody: { position: "absolute", left: spacing.md, right: spacing.md, bottom: spacing.md },
-  eventCat: { color: colors.brandSecondary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
-  eventTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "700", marginTop: 2 },
-  eventMeta: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 4 },
-  matchCard: { width: 140, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, alignItems: "center" },
-  matchName: { color: colors.onSurface, fontWeight: "700", fontSize: 14 },
-  matchMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
-  circleRow: { flexDirection: "row", alignItems: "center", padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, marginBottom: spacing.sm },
-  avatarStack: { flexDirection: "row" },
-  circleName: { color: colors.onSurface, fontWeight: "700", fontSize: 15 },
-  circleMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  recRow: { flexDirection: "row", alignItems: "center", padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, marginBottom: spacing.sm },
-  recImg: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.surfaceTertiary },
-  recCat: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
-  recTitle: { color: colors.onSurface, fontWeight: "700", fontSize: 14, marginTop: 2 },
-  recCreator: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  reminder: { flexDirection: "row", alignItems: "center", marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandPrimary },
-  reminderIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  reminderTitle: { color: colors.onBrandPrimary, fontWeight: "800", fontSize: 14 },
-  reminderMeta: { color: colors.onBrandPrimary, fontSize: 12, marginTop: 2, opacity: 0.9 },
-  weekendSection: { marginHorizontal: spacing.xl, marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.divider },
-  weekendHeader: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: spacing.sm },
-  weekendKicker: { color: colors.brandPrimary, fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
-  weekendTitle: { color: colors.onSurface, fontSize: 20, fontWeight: "900", marginTop: 2 },
-  weekendSee: { color: colors.brandPrimary, fontSize: 12, fontWeight: "800", paddingVertical: 4 },
-  weekendList: { borderTopWidth: 1, borderTopColor: colors.divider },
-  weekendEvent: { minHeight: 66, flexDirection: "row", alignItems: "center", gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  weekendDay: { width: 42, height: 30, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" },
-  weekendDayText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
-  weekendEventBody: { flex: 1, minWidth: 0 },
-  weekendEventTitle: { color: colors.onSurface, fontSize: 14, fontWeight: "800" },
-  weekendEventMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
+
+  feedTabs: { height: 48, marginHorizontal: spacing.xl, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.divider },
+  feedTabGroup: { height: "100%", flexDirection: "row", alignItems: "stretch" },
+  feedTab: { justifyContent: "center", marginRight: 26, paddingHorizontal: 1 },
+  feedTabActive: { borderBottomWidth: 2, borderBottomColor: colors.brandPrimary },
+  feedTabText: { color: colors.muted, fontSize: 14, fontWeight: "700" },
+  feedTabTextActive: { color: colors.onSurface, fontWeight: "900" },
+  feedCreate: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
+
+  feed: { paddingHorizontal: spacing.xl },
+  feedPost: { flexDirection: "row", gap: 11, paddingVertical: 17, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  feedPostBody: { flex: 1 },
+  feedPostTop: { flexDirection: "row", alignItems: "center", gap: 7 },
+  feedPostName: { flexShrink: 1, color: colors.onSurface, fontSize: 14, fontWeight: "900" },
+  feedPostIntent: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
+  feedPostText: { color: colors.onSurface, fontSize: 15, lineHeight: 21, marginTop: 6 },
+  feedPostActions: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 10 },
+  feedDown: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" },
+
+  feedSignal: { flexDirection: "row", alignItems: "center", gap: 11, marginVertical: 8, paddingVertical: 13, paddingHorizontal: 12, borderRadius: radius.lg, backgroundColor: colors.brandTertiary },
+  signalIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  signalBody: { flex: 1, minWidth: 0 },
+  signalKicker: { color: colors.brandPrimary, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  signalTitle: { color: colors.onSurface, fontSize: 13, fontWeight: "800", marginTop: 2 },
+  signalMeta: { color: colors.muted, fontSize: 11, marginTop: 2 },
+
+  feedEmpty: { alignItems: "center", paddingVertical: 72, paddingHorizontal: 28 },
+  feedEmptyTitle: { color: colors.onSurface, fontSize: 18, fontWeight: "900", marginTop: 12 },
+  feedEmptyText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 5 },
+  emptyAction: { marginTop: spacing.lg, backgroundColor: colors.brandPrimary, paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.pill },
+  emptyActionText: { color: colors.onBrandPrimary, fontSize: 13, fontWeight: "800" },
+
+  caughtUp: { alignItems: "center", paddingTop: 42, paddingBottom: 26 },
+  caughtIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" },
+  caughtTitle: { color: colors.onSurface, fontSize: 15, fontWeight: "900", marginTop: 10 },
+  caughtText: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  exploreLink: { color: colors.brandPrimary, fontSize: 13, fontWeight: "800", marginTop: 10, paddingVertical: 5 },
+
   createOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
   createSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: spacing.xl, paddingTop: 10, paddingBottom: 36 },
   createHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: "center", marginBottom: spacing.lg },
