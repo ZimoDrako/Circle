@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 import { api } from "@/src/api";
 
@@ -21,6 +21,8 @@ const TIMES = ["Right now", "Later today", "Tonight"];
 const PEOPLE = ["Meet new people", "Friends", "Either"];
 
 export default function DailyCircle() {
+  const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const [vibe, setVibe] = useState("Food");
   const [time, setTime] = useState("Tonight");
@@ -68,11 +70,11 @@ export default function DailyCircle() {
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.replace("/(tabs)/home")} style={styles.back}><Icon name="chevron-back" size={24} color={colors.onSurface} /></Pressable>
+        <Pressable onPress={() => router.replace("/(tabs)/home")} style={styles.back}><Icon name="chevron-back" size={24} color={themeColors.onSurface} /></Pressable>
         <Text style={styles.headerTitle}>Daily Circle</Text><View style={{ width: 42 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.badge}><Icon name="sparkles" size={14} color={colors.brandPrimary} /><Text style={styles.badgeText}>PERSONALIZED FOR TODAY</Text></View>
+        <View style={styles.badge}><Icon name="sparkles" size={14} color={themeColors.brandPrimary} /><Text style={styles.badgeText}>PERSONALIZED FOR TODAY</Text></View>
         <Text style={styles.title}>What's the move?</Text>
         <Text style={styles.subtitle}>Pick your vibe. Circle finds students who are free and want to do the same thing.</Text>
 
@@ -91,15 +93,15 @@ export default function DailyCircle() {
         <View style={styles.row}>{PEOPLE.map(x => <Pressable key={x} onPress={() => setPeople(x)} style={[styles.pill, people === x && styles.selected]}><Text style={[styles.pillText,people === x && styles.selectedText]}>{x}</Text></Pressable>)}</View>
 
         <View style={styles.preview}>
-          <View style={styles.previewIcon}><Icon name="people" size={22} color={colors.onBrandPrimary} /></View>
+          <View style={styles.previewIcon}><Icon name="people" size={22} color={themeColors.onBrandPrimary} /></View>
           <View style={{ flex: 1 }}><Text style={styles.previewTitle}>Your next Circle</Text><Text style={styles.previewText}>{vibe} · {time} · {people}</Text></View>
         </View>
         <Pressable style={[styles.cta, loading && { opacity: .6 }]} disabled={loading} onPress={findCircle}>
-          <Text style={styles.ctaText}>{loading ? "Finding your people..." : "Find my Circle"}</Text><Icon name="arrow-forward" size={18} color={colors.onBrandPrimary} />
+          <Text style={styles.ctaText}>{loading ? "Finding your people..." : "Find my Circle"}</Text><Icon name="arrow-forward" size={18} color={themeColors.onBrandPrimary} />
         </Pressable>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {result?.status === "waiting" ? <View style={styles.waiting}><Icon name="time-outline" size={20} color={colors.brandPrimary}/><View style={{flex:1}}><Text style={styles.waitingTitle}>Finding your Circle...</Text><Text style={styles.waitingText}>Your plan is saved. You can leave this screen — Circle will keep looking for compatible students today.</Text></View></View> : null}
-        {result?.status === "ready" ? <View style={styles.ready}><View style={styles.readyIcon}><Icon name="checkmark" size={34} color={colors.onBrandPrimary}/></View><Text style={styles.readyTitle}>Your Circle is ready</Text><Text style={styles.readyText}>{result.circle?.name} · {result.circle?.member_ids?.length || 0} people</Text><Text style={styles.readyText}>Opening your group chat...</Text><Pressable style={styles.openNow} onPress={() => router.replace(`/circle/${result.circle.id}`)}><Text style={styles.openNowText}>Open Circle now</Text></Pressable></View> : null}
+        {result?.status === "waiting" ? <View style={styles.waiting}><Icon name="time-outline" size={20} color={themeColors.brandPrimary}/><View style={{flex:1}}><Text style={styles.waitingTitle}>Finding your Circle...</Text><Text style={styles.waitingText}>Your plan is saved. You can leave this screen — Circle will keep looking for compatible students today.</Text></View></View> : null}
+        {result?.status === "ready" ? <View style={styles.ready}><View style={styles.readyIcon}><Icon name="checkmark" size={34} color={themeColors.onBrandPrimary}/></View><Text style={styles.readyTitle}>Your Circle is ready</Text><Text style={styles.readyText}>{result.circle?.name} · {result.circle?.member_ids?.length || 0} people</Text><Text style={styles.readyText}>Opening your group chat...</Text><Pressable style={styles.openNow} onPress={() => router.replace(`/circle/${result.circle.id}`)}><Text style={styles.openNowText}>Open Circle now</Text></Pressable></View> : null}
       </ScrollView>
       <MainTabBar />
     </SafeAreaView>
