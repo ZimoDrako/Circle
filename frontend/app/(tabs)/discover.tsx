@@ -8,6 +8,7 @@ import Icon from "@react-native-vector-icons/ionicons";
 import { spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
+import { useAuth } from "@/src/auth";
 
 const FILTERS = ["For You", "Tonight", "This Week", "People", "Events", "Clubs"] as const;
 const VIBES = [
@@ -25,6 +26,7 @@ export default function Discover() {
   const { colors } = useTheme();
   const styles = useStyles();
   const router = useRouter();
+  const { user } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<string>("For You");
   const [events, setEvents] = useState<any[]>([]);
@@ -50,22 +52,80 @@ export default function Discover() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const search = q.trim().toLowerCase();
+  const norm = (value: any) => String(value || "").toLowerCase();
+  const vibeTerms: Record<string, string[]> = {
+    Food: ["food", "eat", "restaurant", "cafe", "coffee", "dining"],
+    Study: ["study", "library", "academic", "homework", "school"],
+    Active: ["active", "fitness", "gym", "sport", "basketball", "soccer", "run", "hike"],
+    Gaming: ["gaming", "game", "esports", "video game"],
+    Creative: ["creative", "art", "design", "photo", "film", "writing"],
+    Music: ["music", "concert", "band", "dj", "sing"],
+    Social: ["social", "party", "hangout", "meet", "community"],
+    Explore: ["explore", "adventure", "trip", "outdoor", "travel"],
+  };
+  const blob = (item: any) => [
+    item?.title, item?.name, item?.category, item?.description, item?.location,
+    item?.major, ...(item?.interests || []), ...(item?.tags || [])
+  ].filter(Boolean).join(" ").toLowerCase();
+  const matchesVibe = (item: any, vibe: string) => (vibeTerms[vibe] || []).some((term) => blob(item).includes(term));
+  const eventDate = (e: any) => {
+    const raw = e?.start_at || e?.starts_at || e?.datetime || e?.date;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const isTonight = (e: any) => {
+    const d = eventDate(e);
+    const now = new Date();
+    if (!d) return false;
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && d.getHours() >= 17;
+  };
+  const isThisWeek = (e: any) => {
+    const d = eventDate(e);
+    if (!d) return false;
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(now.getDate() + 7);
+    end.setHours(23, 59, 59, 999);
+    return d >= now && d <= end;
+  };
+  const userInterests = (((user as any)?.interests || []) as string[]).map((x) => x.toLowerCase());
+  const relevance = (item: any) => userInterests.reduce((score, interest) => score + (blob(item).includes(interest) ? 1 : 0), 0);
   const includes = (item: any, fields: string[]) => !search || fields.some((key) => String(item?.[key] || "").toLowerCase().includes(search));
-  const shownEvents = useMemo(() => events.filter((e) => includes(e, ["title", "category", "description", "location"])), [events, search]);
-  const shownPeople = useMemo(() => people.filter((p) => includes(p, ["first_name", "last_name", "major"]) || (p.interests || []).some((i: string) => i.toLowerCase().includes(search))), [people, search]);
-  const shownClubs = useMemo(() => clubs.filter((c) => includes(c, ["name", "description", "category"])), [clubs, search]);
-  const shownRecs = useMemo(() => recs.filter((r) => includes(r, ["title", "description", "category"])), [recs, search]);
+  const shownEvents = useMemo(() => {
+    let list = events.filter((e) => includes(e, ["title", "category", "description", "location"]));
+    if (filter === "Tonight") list = list.filter(isTonight);
+    else if (filter === "This Week") list = list.filter(isThisWeek);
+    else if (vibeTerms[filter]) list = list.filter((e) => matchesVibe(e, filter));
+    else if (filter === "For You" && !search) list = [...list].sort((a, b) => relevance(b) - relevance(a));
+    return list;
+  }, [events, search, filter, userInterests.join("|")]);
+  const shownPeople = useMemo(() => {
+    let list = people.filter((p) => includes(p, ["first_name", "last_name", "major"]) || (p.interests || []).some((i: string) => i.toLowerCase().includes(search)));
+    if (vibeTerms[filter]) list = list.filter((p) => matchesVibe(p, filter));
+    return [...list].sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
+  }, [people, search, filter]);
+  const shownClubs = useMemo(() => {
+    let list = clubs.filter((club) => includes(club, ["name", "description", "category"]));
+    if (vibeTerms[filter]) list = list.filter((club) => matchesVibe(club, filter));
+    else if (filter === "For You" && !search) list = [...list].sort((a, b) => relevance(b) - relevance(a));
+    return list;
+  }, [clubs, search, filter, userInterests.join("|")]);
+  const shownRecs = useMemo(() => {
+    let list = recs.filter((r) => includes(r, ["title", "description", "category"]));
+    if (vibeTerms[filter]) list = list.filter((r) => matchesVibe(r, filter));
+    else if (filter === "For You" && !search) list = [...list].sort((a, b) => relevance(b) - relevance(a));
+    return list;
+  }, [recs, search, filter, userInterests.join("|")]);
 
   const selectFilter = (value: string) => {
     setFilter(value);
-    if (["People", "Events", "Clubs"].includes(value)) return;
-    if (value !== "For You") setQ(value);
-    else setQ("");
+    setQ("");
   };
 
   const browseVibe = (vibe: string) => {
     setFilter(vibe);
-    setQ(vibe);
+    setQ("");
   };
 
   const SectionHead = ({ title, action }: { title: string; action?: string }) => (
@@ -89,6 +149,7 @@ export default function Discover() {
 
   const isSearch = q.trim().length > 0;
   const categoryOnly = ["People", "Events", "Clubs"].includes(filter);
+  const browseMode = ["Tonight", "This Week"].includes(filter) || !!vibeTerms[filter];
 
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
@@ -104,11 +165,11 @@ export default function Discover() {
           {FILTERS.map((item) => <Pressable key={item} onPress={() => selectFilter(item)} style={[styles.filterChip, filter === item && styles.filterChipActive]}><Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item}</Text></Pressable>)}
         </ScrollView>
 
-        {isSearch || categoryOnly ? (
+        {isSearch || categoryOnly || browseMode ? (
           <View style={styles.results}>
             <Text style={styles.resultsTitle}>{isSearch ? `Explore “${q}”` : filter}</Text>
             {(filter === "Events" || !categoryOnly) && shownEvents.slice(0, 8).map((e) => eventCard(e))}
-            {(filter === "People" || !categoryOnly) && shownPeople.slice(0, 8).map((p) => (
+            {(filter === "People" || (!categoryOnly && !["Tonight", "This Week"].includes(filter))) && shownPeople.slice(0, 8).map((p) => (
               <Pressable key={p.id} onPress={() => router.push(`/match/${p.id}`)} style={styles.personRow}>
                 <Avatar uri={p.profile_photo_url} name={p.first_name} size={52} />
                 <View style={styles.personBody}><Text style={styles.personName}>{p.first_name} {p.last_name}</Text><Text numberOfLines={1} style={styles.personMeta}>{(p.interests || []).slice(0, 3).join(" · ") || p.major || "Student"}</Text></View>
@@ -116,21 +177,21 @@ export default function Discover() {
                 <Icon name="chevron-forward" size={18} color={colors.muted} />
               </Pressable>
             ))}
-            {(filter === "Clubs" || !categoryOnly) && shownClubs.slice(0, 8).map((c) => (
+            {(filter === "Clubs" || (!categoryOnly && !["Tonight", "This Week"].includes(filter))) && shownClubs.slice(0, 8).map((c) => (
               <Pressable key={c.id} onPress={() => router.push(`/club/${c.id}`)} style={styles.clubRow}>
                 {c.image_url ? <Image source={{ uri: c.image_url }} style={styles.clubIcon} contentFit="cover" /> : <View style={styles.clubIconFallback}><Icon name="people-outline" size={20} color={colors.brandPrimary} /></View>}
                 <View style={styles.personBody}><Text style={styles.personName}>{c.name}</Text><Text numberOfLines={1} style={styles.personMeta}>{c.description || `${c.member_ids?.length || 0} members`}</Text></View>
                 <Icon name="chevron-forward" size={18} color={colors.muted} />
               </Pressable>
             ))}
-            {!categoryOnly && shownRecs.slice(0, 4).map((r) => (
+            {!categoryOnly && !["Tonight", "This Week"].includes(filter) && shownRecs.slice(0, 4).map((r) => (
               <Pressable key={r.id} onPress={() => router.push(`/recommendation/${r.id}`)} style={styles.clubRow}>
                 <View style={styles.clubIconFallback}><Icon name="sparkles-outline" size={20} color={colors.brandPrimary} /></View>
                 <View style={styles.personBody}><Text style={styles.personName}>{r.title}</Text><Text numberOfLines={1} style={styles.personMeta}>{r.description}</Text></View>
                 <Icon name="chevron-forward" size={18} color={colors.muted} />
               </Pressable>
             ))}
-            {shownEvents.length + shownPeople.length + shownClubs.length + shownRecs.length === 0 && <Text style={styles.empty}>Nothing here yet. Try another interest or category.</Text>}
+            {(shownEvents.length + (["Tonight", "This Week"].includes(filter) ? 0 : shownPeople.length + shownClubs.length + shownRecs.length)) === 0 && <Text style={styles.empty}>Nothing here yet. Try another interest or category.</Text>}
           </View>
         ) : (
           <>
