@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, spacing } from "@/src/theme";
+import { colors, spacing, useTheme } from "@/src/theme";
 
 const sideTabs = [
   { label: "Home", icon: "home-outline", activeIcon: "home", path: "/(tabs)/home", match: "/home" },
@@ -12,6 +12,7 @@ const sideTabs = [
 ] as const;
 
 export function MainTabBar() {
+  const { colors: themeColors } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const left = sideTabs.slice(0, 2);
@@ -19,7 +20,7 @@ export function MainTabBar() {
 
   const renderTab = (tab: typeof sideTabs[number]) => {
     const active = pathname === tab.match;
-    const color = active ? colors.brandPrimary : colors.muted;
+    const color = active ? themeColors.brandPrimary : themeColors.muted;
     return (
       <Pressable key={tab.label} onPress={() => router.replace(tab.path)} style={styles.item}>
         <Icon name={active ? tab.activeIcon : tab.icon} size={22} color={color} />
@@ -34,9 +35,9 @@ export function MainTabBar() {
         {left.map(renderTab)}
         <Pressable onPress={() => router.replace("/(tabs)/create")} style={styles.createWrap} testID="tab-create">
           <View style={[styles.createButton, pathname === "/create" && styles.createActive]}>
-            <Icon name="add" size={32} color={colors.onBrandPrimary} />
+            <Icon name="add" size={32} color={themeColors.onBrandPrimary} />
           </View>
-          <Text style={[styles.createLabel, pathname === "/create" && { color: colors.brandPrimary }]}>Create</Text>
+          <Text style={[styles.createLabel, pathname === "/create" && { color: themeColors.brandPrimary }]}>Create</Text>
         </Pressable>
         {right.map(renderTab)}
       </View>
