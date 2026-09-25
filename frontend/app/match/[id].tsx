@@ -9,7 +9,7 @@ import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function MatchDetail() {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, scheme } = useTheme();
   const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -134,7 +134,7 @@ export default function MatchDetail() {
           <View style={styles.previewRow}>{preview.map((i: string) => { const shared = sharedNorm.has(i.trim().toLowerCase()); return <View key={i} style={styles.previewTile}><View style={[styles.interestEmblem, shared && styles.interestShared]}><Icon name={interestIcon(i) as any} size={20} color={shared ? colors.onBrandPrimary : colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text>{shared && <Text style={styles.sharedLabel}>Both</Text>}</View>; })}{sortedInterests.length > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{sortedInterests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
         </Pressable>
 
-        {(u.looking_for || []).length > 0 && <View style={styles.plainSection}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={themeColors.brandPrimary} /></View><View style={styles.lookingWrap}>{u.looking_for.map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View></View>}
+        {(u.looking_for || []).length > 0 && <View style={styles.plainSection}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={themeColors.brandPrimary} /></View><View style={styles.lookingWrap}>{u.looking_for.map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={[styles.lookingText, scheme === "dark" && { color: "#FFFFFF" }]}>{item}</Text></View>)}</View></View>}
         </>}
 
         {profileTab === "events" && <View style={styles.circlesSection}>
