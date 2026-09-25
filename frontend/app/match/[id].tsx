@@ -16,11 +16,19 @@ export default function MatchDetail() {
   const [interestsOpen, setInterestsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [connections, setConnections] = useState<any[]>([]);
+  const [profileCircles, setProfileCircles] = useState<any[]>([]);
+  const [profileTab, setProfileTab] = useState<"about" | "circles">("about");
 
   const load = useCallback(async () => {
     try {
-      const [profile, conns] = await Promise.all([api.getUser(id!), api.getUserConnections(id!)]);
-      setData(profile); setConnections(conns.connections || []);
+      const [profile, conns, circles] = await Promise.all([
+        api.getUser(id!),
+        api.getUserConnections(id!),
+        api.getUserProfileCircles(id!),
+      ]);
+      setData(profile);
+      setConnections(conns.connections || []);
+      setProfileCircles(circles.circles || []);
     } catch {}
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -86,6 +94,18 @@ export default function MatchDetail() {
           <Icon name="chevron-forward" size={19} color={colors.brandPrimary} />
         </Pressable>
 
+        <View style={styles.profileTabs}>
+          <Pressable style={styles.profileTab} onPress={() => setProfileTab("about")}>
+            <Text style={[styles.profileTabText, profileTab === "about" && styles.profileTabTextActive]}>About</Text>
+            {profileTab === "about" && <View style={styles.profileTabLine} />}
+          </Pressable>
+          <Pressable style={styles.profileTab} onPress={() => setProfileTab("circles")}>
+            <Text style={[styles.profileTabText, profileTab === "circles" && styles.profileTabTextActive]}>Circles</Text>
+            {profileTab === "circles" && <View style={styles.profileTabLine} />}
+          </Pressable>
+        </View>
+
+        {profileTab === "about" && <>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>About me</Text>
           <Text style={styles.bio}>{u.bio || `${u.first_name} hasn't added a bio yet.`}</Text>
@@ -110,6 +130,27 @@ export default function MatchDetail() {
         </View>
 
         {(u.looking_for || []).length > 0 && <View style={styles.compactCard}><Icon name="search-outline" size={18} color={colors.brandPrimary} /><Text style={styles.compactTitle}>Looking for</Text><Text numberOfLines={1} style={styles.compactValue}>{u.looking_for.join(", ")}</Text></View>}
+        </>}
+
+        {profileTab === "circles" && <View style={styles.circlesSection}>
+          {profileCircles.length === 0 ? (
+            <View style={styles.circleEmpty}>
+              <Icon name="people-circle-outline" size={38} color={colors.brandPrimary} />
+              <Text style={styles.circleEmptyTitle}>No Circles shown</Text>
+              <Text style={styles.circleEmptyText}>{u.first_name} hasn't chosen any Circles to display on their profile.</Text>
+            </View>
+          ) : profileCircles.map((circle: any) => (
+            <Pressable key={circle.id} style={styles.circleRow} onPress={() => router.push(`/circle/${circle.id}`)}>
+              <View style={styles.circleIcon}><Icon name="people" size={22} color={colors.brandPrimary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.circleName}>{circle.name}</Text>
+                <Text numberOfLines={1} style={styles.circleMeta}>{(circle.interests || []).slice(0, 3).join(" · ") || `${(circle.member_ids || []).length} members`}</Text>
+              </View>
+              <View style={styles.privateBadge}><Icon name="lock-closed-outline" size={13} color={colors.brandPrimary} /><Text style={styles.privateBadgeText}>Chat private</Text></View>
+              <Icon name="chevron-forward" size={18} color={colors.muted} />
+            </Pressable>
+          ))}
+        </View>}
 
         {conn.status === "pending_in" && <View style={styles.pending}><Icon name="mail-unread-outline" size={17} color={colors.brandPrimary} /><Text style={styles.pendingText}>{u.first_name} wants to connect with you</Text></View>}
       </ScrollView>
@@ -134,11 +175,13 @@ const styles = StyleSheet.create({
   banner: { position: "absolute", top: 0, left: 0, right: 0, height: 185, backgroundColor: colors.brandTertiary }, bannerImage: { width: "100%", height: "100%" }, bannerFallback: { flex: 1, backgroundColor: colors.brandTertiary }, identity: { flex: 1, paddingBottom: 5 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }, name: { fontSize: 23, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 12, marginTop: 3 },
   matchRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: colors.brandPrimary, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 4 }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 18 }, matchLabel: { color: colors.muted, fontWeight: "700", fontSize: 10 },
   actions: { flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.xl }, connectionRow: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, connectionLeft: { flexDirection: "row", alignItems: "center", gap: 7 }, connectionCount: { fontWeight: "900", color: colors.onSurface, fontSize: 15 }, connectionText: { color: colors.muted, fontSize: 14 },
+  profileTabs: { flexDirection: "row", marginTop: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { color: colors.muted, fontSize: 13, fontWeight: "800" }, profileTabTextActive: { color: colors.onSurface }, profileTabLine: { position: "absolute", left: "24%", right: "24%", bottom: -1, height: 2, borderRadius: 2, backgroundColor: colors.brandPrimary },
   card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }, cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { color: colors.onSurface, fontWeight: "800", fontSize: 17 }, cardSub: { color: colors.muted, fontSize: 12, marginTop: 2 }, bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
   detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
   interestGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: spacing.md }, interestTile: { width: "30%", minWidth: 86, alignItems: "center", gap: 5, paddingVertical: 8 }, interestEmblem: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, interestShared: { backgroundColor: colors.brandPrimary }, interestName: { color: colors.onSurface, fontSize: 11, fontWeight: "700", maxWidth: 88, textAlign: "center" }, sharedLabel: { color: colors.brandPrimary, fontSize: 9, fontWeight: "900", textTransform: "uppercase" }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
   youTwo: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.brandTertiary }, youTitle: { flexDirection: "row", alignItems: "center", gap: 7 }, youScore: { color: colors.brandPrimary, fontSize: 14, fontWeight: "900" }, reason: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md }, reasonText: { color: colors.onBrandTertiary, fontSize: 13, flex: 1 },
   compactCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary }, compactTitle: { color: colors.onSurface, fontWeight: "800" }, compactValue: { color: colors.muted, fontSize: 12, flex: 1, textAlign: "right" }, pending: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandTertiary }, pendingText: { color: colors.onBrandTertiary, fontWeight: "700", flex: 1 },
+  circlesSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, gap: spacing.sm }, circleEmpty: { alignItems: "center", paddingVertical: 48, paddingHorizontal: spacing.xl }, circleEmptyTitle: { marginTop: spacing.md, color: colors.onSurface, fontSize: 17, fontWeight: "900" }, circleEmptyText: { marginTop: 6, color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: "center" }, circleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, circleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandTertiary }, circleName: { color: colors.onSurface, fontSize: 15, fontWeight: "900" }, circleMeta: { color: colors.muted, fontSize: 12, marginTop: 3 }, privateBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, privateBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
   modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 }, empty: { color: colors.muted, textAlign: "center", marginTop: spacing.xxxl }, personRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, personName: { color: colors.onSurface, fontSize: 15, fontWeight: "800" }, personMeta: { color: colors.muted, fontSize: 12, marginTop: 3 },
 });
