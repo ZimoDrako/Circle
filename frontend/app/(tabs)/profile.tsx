@@ -92,7 +92,7 @@ export default function Profile() {
       <SafeAreaView edges={["top"]} style={styles.safeTop}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Profile</Text>
-          <Pressable style={styles.iconButton} onPress={() => router.push("/settings")} testID="profile-settings"><Icon name="settings-outline" size={22} color={colors.onSurface} /></Pressable>
+          <Pressable style={styles.iconButton} onPress={() => router.push("/settings")} testID="profile-settings"><Icon name="settings-outline" size={22} color={themeColors.onSurface} /></Pressable>
         </View>
       </SafeAreaView>
 
@@ -172,16 +172,16 @@ export default function Profile() {
               <View style={styles.eventBody}><View style={styles.eventTop}><Text numberOfLines={1} style={styles.eventTitle}>{event.title}</Text><View style={styles.eventStatus}><Text style={styles.eventStatusText}>{status}</Text></View></View>
               <Text style={styles.eventMeta}>{[event.date, event.time].filter(Boolean).join(" · ")}</Text>
               {!!event.location && <Text numberOfLines={1} style={styles.eventMeta}>{event.location}</Text>}</View>
-              <Icon name="chevron-forward" size={18} color={colors.muted} />
+              <Icon name="chevron-forward" size={18} color={themeColors.muted} />
             </Pressable>;
           })}
         </View>}
         {profileTab === "posts" && <View style={styles.postsSection}>
           <Pressable style={styles.createPostRow} onPress={() => router.push("/create-post")}><Avatar uri={user.profile_photo_url} name={user.first_name} size={38} /><Text style={styles.createPostPrompt}>Start a conversation or make a plan...</Text><View style={styles.createPostPlus}><Icon name="add" size={20} color={themeColors.onBrandPrimary} /></View></Pressable>
           {posts.length === 0 ? <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={themeColors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No posts yet</Text><Text style={styles.tabEmptyText}>Ask a question, find people for a plan, or share what's happening around campus.</Text></View> : posts.map((post:any) => <Pressable key={post.id} style={styles.postCard} onPress={() => router.push(`/post/${post.id}`)}>
-            <View style={styles.postHead}><Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name || user.first_name} size={38} /><View style={{flex:1}}><Text style={styles.postName}>{post.author?.first_name || user.first_name} {post.author?.last_name || user.last_name}</Text><Text style={styles.postMeta}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : "Post"} · {post.audience === "connections" ? "Connections" : "Campus"}</Text></View><Pressable onPress={() => Alert.alert("Delete post?", "This cannot be undone.", [{text:"Cancel",style:"cancel"},{text:"Delete",style:"destructive",onPress:async()=>{await api.deletePost(post.id);setPosts((p)=>p.filter((x:any)=>x.id!==post.id));}}])}><Icon name="ellipsis-horizontal" size={20} color={colors.muted} /></Pressable></View>
+            <View style={styles.postHead}><Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name || user.first_name} size={38} /><View style={{flex:1}}><Text style={styles.postName}>{post.author?.first_name || user.first_name} {post.author?.last_name || user.last_name}</Text><Text style={styles.postMeta}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : "Post"} · {post.audience === "connections" ? "Connections" : "Campus"}</Text></View><Pressable onPress={() => Alert.alert("Delete post?", "This cannot be undone.", [{text:"Cancel",style:"cancel"},{text:"Delete",style:"destructive",onPress:async()=>{await api.deletePost(post.id);setPosts((p)=>p.filter((x:any)=>x.id!==post.id));}}])}><Icon name="ellipsis-horizontal" size={20} color={themeColors.muted} /></Pressable></View>
             <Text style={styles.postText}>{post.content}</Text>
-            <View style={styles.postActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{["anyone_down","looking_for_people"].includes(post.intent) && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.postActionText}>{post.interest_count || 0} down</Text></>}</View>
+            <View style={styles.postActions}><Icon name="chatbubble-outline" size={15} color={themeColors.muted} />{["anyone_down","looking_for_people"].includes(post.intent) && <><Icon name="people-outline" size={16} color={themeColors.brandPrimary} /><Text style={styles.postActionText}>{post.interest_count || 0} down</Text></>}</View>
           </Pressable>)}
         </View>}
         {profileTab === "circles" && <View style={styles.eventsSection}>
@@ -191,7 +191,7 @@ export default function Profile() {
               <View style={styles.circleIcon}><Icon name="people" size={22} color={themeColors.brandPrimary} /></View>
               <View style={{ flex: 1 }}><Text style={styles.eventTitle}>{circle.name}</Text><Text numberOfLines={1} style={styles.eventMeta}>{(circle.interests || []).slice(0, 3).join(" · ") || `${(circle.member_ids || []).length} members`}</Text></View>
               {shown && <View style={styles.shownBadge}><Icon name="eye" size={13} color={themeColors.brandPrimary} /><Text style={styles.shownBadgeText}>On profile</Text></View>}
-              <Icon name="chevron-forward" size={18} color={colors.muted} />
+              <Icon name="chevron-forward" size={18} color={themeColors.muted} />
             </Pressable>;
           })}
           {myCircles.some((circle: any) => circle.type === "daily") && <Text style={styles.privateNote}>Daily Circles stay private and never appear on your public profile.</Text>}
@@ -201,13 +201,13 @@ export default function Profile() {
 
       <Modal visible={connectionsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setConnectionsOpen(false)}>
         <SafeAreaView style={styles.modalRoot}>
-          <View style={styles.modalHeader}><Text style={styles.modalTitle}>Connections</Text><Pressable onPress={() => setConnectionsOpen(false)}><Icon name="close" size={26} color={colors.onSurface} /></Pressable></View>
+          <View style={styles.modalHeader}><Text style={styles.modalTitle}>Connections</Text><Pressable onPress={() => setConnectionsOpen(false)}><Icon name="close" size={26} color={themeColors.onSurface} /></Pressable></View>
           <ScrollView contentContainerStyle={styles.modalContent}>
             {connections.length === 0 ? <Text style={styles.empty}>Your accepted connections will appear here.</Text> : connections.map((c: any) => (
               <Pressable key={c.id} style={styles.personRow} onPress={() => { setConnectionsOpen(false); router.push(`/match/${c.user.id}`); }}>
                 <Avatar uri={c.user.profile_photo_url} name={c.user.first_name} size={48} />
                 <View style={{ flex: 1 }}><Text style={styles.personName}>{c.user.first_name} {c.user.last_name}</Text><Text style={styles.personMeta}>{[c.user.major, c.user.year].filter(Boolean).join(" · ")}</Text></View>
-                <Icon name="chevron-forward" size={18} color={colors.muted} />
+                <Icon name="chevron-forward" size={18} color={themeColors.muted} />
               </Pressable>
             ))}
           </ScrollView>
@@ -216,7 +216,7 @@ export default function Profile() {
 
       <Modal visible={interestsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setInterestsOpen(false)}>
         <SafeAreaView style={styles.modalRoot}>
-          <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View><Pressable onPress={() => setInterestsOpen(false)}><Icon name="close" size={26} color={colors.onSurface} /></Pressable></View>
+          <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>Interests</Text><Text style={styles.cardSub}>{user.interests?.length || 0} selected</Text></View><Pressable onPress={() => setInterestsOpen(false)}><Icon name="close" size={26} color={themeColors.onSurface} /></Pressable></View>
           <ScrollView contentContainerStyle={styles.modalContent}><View style={styles.modalInterestGrid}>{(user.interests || []).map((i: string) => <View key={i} style={styles.modalInterestTile}><View style={styles.interestEmblem}><Icon name={interestIcon(i) as any} size={20} color={themeColors.brandPrimary} /></View><Text numberOfLines={2} style={styles.modalInterestName}>{i}</Text></View>)}</View></ScrollView>
         </SafeAreaView>
       </Modal>
@@ -246,7 +246,7 @@ const useStyles = makeStyles((colors) => ({
   plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
-  lookingWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: spacing.md }, lookingTag: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill }, lookingTag0: { backgroundColor: "#EAF3FF" }, lookingTag1: { backgroundColor: "#F1EBFF" }, lookingTag2: { backgroundColor: "#FFF1DF" }, lookingTag3: { backgroundColor: "#E9F8F0" }, lookingTag4: { backgroundColor: "#FFECEF" }, lookingText: { color: colors.onSurface, fontSize: 12, fontWeight: "700" },
+  lookingWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: spacing.md }, lookingTag: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill }, lookingTag0: { backgroundColor: colors.brandTertiary }, lookingTag1: { backgroundColor: colors.surfaceTertiary }, lookingTag2: { backgroundColor: colors.brandTertiary }, lookingTag3: { backgroundColor: colors.surfaceTertiary }, lookingTag4: { backgroundColor: colors.brandTertiary }, lookingText: { color: colors.onSurface, fontSize: 12, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
   previewRow: { flexDirection: "row", justifyContent: "space-between", gap: 3, marginTop: spacing.sm }, previewTile: { flex: 1, minWidth: 0, maxWidth: "20%", alignItems: "center", gap: 5, paddingVertical: 4 }, modalInterestGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }, modalInterestTile: { width: "29%", alignItems: "center", gap: 7, paddingVertical: 8 }, modalInterestName: { color: colors.onSurface, fontSize: 12, fontWeight: "700", textAlign: "center", width: "100%" }, interestEmblem: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, interestName: { color: colors.onSurface, fontSize: 11, fontWeight: "700", maxWidth: 88, textAlign: "center" }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
   signout: { paddingHorizontal: spacing.xl, marginTop: spacing.xl }, modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 },
