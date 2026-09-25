@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image } from "rea
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius, useTheme } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar, Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function MatchDetail() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [data, setData] = useState<any>(null);
@@ -201,7 +202,7 @@ export default function MatchDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface }, safeTop: { backgroundColor: colors.surface }, loading: { padding: 24, color: colors.muted },
   header: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }, headerBtn: { padding: 6 }, headerTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   content: { paddingBottom: 36 }, hero: { minHeight: 300, paddingHorizontal: spacing.xl, paddingTop: 150, paddingBottom: spacing.xl, backgroundColor: colors.surface, overflow: "hidden" },
@@ -220,4 +221,4 @@ const styles = StyleSheet.create({
   matchOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,.38)", justifyContent: "flex-end" }, matchSheet: { backgroundColor: colors.surface, padding: spacing.xl, paddingBottom: 36, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, matchSheetTop: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.lg }, matchSheetIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, matchSheetTitle: { color: colors.onSurface, fontSize: 22, fontWeight: "900" }, matchSheetSub: { color: colors.muted, fontSize: 12, marginTop: 2 }, matchReason: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: 9 }, matchReasonText: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 20, flex: 1 },
   circlesSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, gap: spacing.sm }, circleEmpty: { alignItems: "center", paddingVertical: 48, paddingHorizontal: spacing.xl }, circleEmptyTitle: { marginTop: spacing.md, color: colors.onSurface, fontSize: 17, fontWeight: "900" }, circleEmptyText: { marginTop: 6, color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: "center" }, circleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, circleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandTertiary }, circleName: { color: colors.onSurface, fontSize: 15, fontWeight: "900" }, circleMeta: { color: colors.muted, fontSize: 12, marginTop: 3 }, privateBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, privateBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
   modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 }, empty: { color: colors.muted, textAlign: "center", marginTop: spacing.xxxl }, personRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, personName: { color: colors.onSurface, fontSize: 15, fontWeight: "800" }, personMeta: { color: colors.muted, fontSize: 12, marginTop: 3 },
-});
+}));
