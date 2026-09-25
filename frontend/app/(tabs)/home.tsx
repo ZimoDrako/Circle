@@ -21,11 +21,13 @@ export default function Home() {
   const [digest, setDigest] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [feedMode, setFeedMode] = useState<"for_you" | "connections">("for_you");
 
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [m, e, c, r, rem, dg, nt] = await Promise.all([
+      const [m, e, c, r, rem, dg, nt, pf] = await Promise.all([
         api.getMatches(),
         api.listEvents(),
         api.listCircles(true),
@@ -33,6 +35,7 @@ export default function Home() {
         api.reminders(),
         api.weekendDigest(),
         api.notifications(),
+        api.listPosts(undefined, feedMode),
       ]);
       setMatches(m.matches || []);
       setEvents(e.events || []);
@@ -41,9 +44,10 @@ export default function Home() {
       setReminders(rem.reminders || []);
       setDigest(dg);
       setUnreadCount(nt.unread_count || 0);
+      setPosts(pf.posts || []);
     } catch {}
     setRefreshing(false);
-  }, []);
+  }, [feedMode]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -83,6 +87,24 @@ export default function Home() {
               <Avatar uri={user?.profile_photo_url ?? null} name={user?.first_name} size={44} />
             </Pressable>
           </View>
+        </View>
+
+        <View style={styles.feedHeader}>
+          <View><Text style={styles.feedKicker}>CAMPUS FEED</Text><Text style={styles.feedTitle}>What's happening</Text></View>
+          <Pressable onPress={() => router.push("/create-post")} style={styles.feedCreate}><Icon name="add" size={21} color={colors.onBrandPrimary} /></Pressable>
+        </View>
+        <View style={styles.feedTabs}>
+          <Pressable onPress={() => setFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
+          <Pressable onPress={() => setFeedMode("connections")} style={[styles.feedTab, feedMode === "connections" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "connections" && styles.feedTabTextActive]}>Connections</Text></Pressable>
+        </View>
+        <View style={styles.feed}>
+          {posts.length === 0 ? <View style={styles.feedEmpty}><Icon name="chatbubbles-outline" size={28} color={colors.brandPrimary} /><Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text><Text style={styles.feedEmptyText}>Start something. Ask a question, make a plan, or find people who are down.</Text></View> : posts.slice(0, 12).map((post:any) => {
+            const actionable = ["anyone_down","looking_for_people"].includes(post.intent);
+            return <Pressable key={post.id} onPress={() => router.push(`/post/${post.id}`)} style={styles.feedPost}>
+              <Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name} size={42} />
+              <View style={styles.feedPostBody}><View style={styles.feedPostTop}><Text style={styles.feedPostName}>{post.author?.first_name} {post.author?.last_name}</Text><Text style={styles.feedPostIntent}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : post.intent === "event" ? "Event" : "Post"}</Text></View><Text style={styles.feedPostText}>{post.content}</Text><View style={styles.feedPostActions}><Icon name="chatbubble-outline" size={15} color={colors.muted} />{actionable && <><Icon name="people-outline" size={16} color={colors.brandPrimary} /><Text style={styles.feedDown}>{post.interest_count || 0} down</Text></>}</View></View>
+            </Pressable>;
+          })}
         </View>
 
         <View style={styles.heroSection}>
@@ -221,6 +243,11 @@ const styles = StyleSheet.create({
   bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
   notificationBadge: { position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.error, borderWidth: 2, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   notificationBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", lineHeight: 11 },
+  feedHeader: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  feedKicker: { fontSize: 10, fontWeight: "900", letterSpacing: 1.1, color: colors.brandPrimary }, feedTitle: { fontSize: 23, fontWeight: "900", color: colors.onSurface, marginTop: 2 },
+  feedCreate: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" },
+  feedTabs: { marginHorizontal: spacing.xl, marginTop: spacing.md, flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.divider }, feedTab: { paddingVertical: 10, marginRight: 24 }, feedTabActive: { borderBottomWidth: 2, borderBottomColor: colors.brandPrimary }, feedTabText: { color: colors.muted, fontSize: 13, fontWeight: "700" }, feedTabTextActive: { color: colors.onSurface, fontWeight: "900" },
+  feed: { paddingHorizontal: spacing.xl }, feedPost: { flexDirection: "row", gap: 10, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.divider }, feedPostBody: { flex: 1 }, feedPostTop: { flexDirection: "row", alignItems: "center", gap: 7 }, feedPostName: { flexShrink: 1, color: colors.onSurface, fontSize: 14, fontWeight: "900" }, feedPostIntent: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" }, feedPostText: { color: colors.onSurface, fontSize: 15, lineHeight: 21, marginTop: 6 }, feedPostActions: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 9 }, feedDown: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" }, feedEmpty: { alignItems: "center", paddingVertical: 32, paddingHorizontal: 28 }, feedEmptyTitle: { color: colors.onSurface, fontSize: 16, fontWeight: "900", marginTop: 8 }, feedEmptyText: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
   heroSection: { paddingHorizontal: spacing.xl, marginTop: spacing.xl },
   moveCard: { borderRadius: 26, backgroundColor: colors.onSurface, padding: spacing.xl, overflow: "hidden" },
   moveIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", marginBottom: spacing.md },
