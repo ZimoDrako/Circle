@@ -1,17 +1,15 @@
-import { useEffect, useState } from "react";
+import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/ionicons";
-import { accentOptions, AccentName, ColorScheme, getThemeColors, loadDisplaySettings, saveDisplaySettings, spacing, radius } from "@/src/theme";
+import { accentOptions, AccentName, ColorScheme, getThemeColors, spacing, radius, useTheme } from "@/src/theme";
 import { useAuth } from "@/src/auth";
 
 export default function Settings(){
  const router=useRouter(); const {signOut}=useAuth();
- const [scheme,setScheme]=useState<ColorScheme>("light"); const [accent,setAccent]=useState<AccentName>("green");
- useEffect(()=>{loadDisplaySettings().then(x=>{setScheme(x.scheme);setAccent(x.accent);});},[]);
- const pick=async(s:ColorScheme,a:AccentName)=>{setScheme(s);setAccent(a);await saveDisplaySettings(s,a);};
- const c=getThemeColors(scheme,accent);
+ const {scheme,accent,colors:c,setDisplay}=useTheme();
+ const pick=(s:ColorScheme,a:AccentName)=>setDisplay(s,a);
  return <View style={[styles.root,{backgroundColor:c.surface}]}><SafeAreaView edges={["top"]}><View style={styles.header}><Pressable onPress={()=>router.back()}><Icon name="chevron-back" size={26} color={c.onSurface}/></Pressable><Text style={[styles.title,{color:c.onSurface}]}>Settings</Text><View style={{width:26}}/></View></SafeAreaView>
  <ScrollView contentContainerStyle={styles.content}>
   <Text style={[styles.sectionTitle,{color:c.onSurface}]}>Display</Text><Text style={[styles.sub,{color:c.muted}]}>Choose how Circle looks on this device.</Text>
