@@ -102,6 +102,7 @@ export default function Profile() {
             </View>
             <Text style={styles.meta}>{user.university || "Student"}</Text>
             <Text style={styles.meta}>{[user.major, user.year].filter(Boolean).join(" · ") || "Complete your profile"}</Text>
+            <Text style={styles.profileBio}>{user.bio || "Add a short bio so people know what you're into."}</Text>
           </View>
           <Pressable style={styles.editButton} onPress={() => router.push("/edit-profile")} testID="edit-profile"><Text style={styles.editText}>Edit profile</Text></Pressable>
         </View>
@@ -124,11 +125,6 @@ export default function Profile() {
           <Pressable style={styles.metric} onPress={() => setInterestsOpen(true)}>
             <Text style={styles.metricNum}>{user.interests?.length || 0}</Text><Text style={styles.metricLabel}>Interests</Text>
           </Pressable>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}><Text style={styles.cardTitle}>About me</Text><Icon name="create-outline" size={18} color={colors.muted} /></View>
-          <Text style={styles.bio}>{user.bio || "Add a short bio so people know what you're into and what kind of people you'd like to meet."}</Text>
         </View>
 
         <Pressable style={styles.plainSection} onPress={() => setInterestsOpen(true)}>
@@ -181,7 +177,7 @@ const styles = StyleSheet.create({
   bannerImage: { width: "100%", height: "100%" }, bannerFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandTertiary, gap: 5 }, bannerHint: { color: colors.onBrandTertiary, fontWeight: "700", fontSize: 12 },
   bannerEdit: { position: "absolute", right: 16, top: 14, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,.55)", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 18 }, bannerEditText: { color: "#FFF", fontWeight: "800", fontSize: 11 },
   avatarWrap: { alignSelf: "flex-start" }, cameraBadge: { position: "absolute", right: -2, bottom: 2, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.surfaceSecondary },
-  identity: { marginTop: spacing.md, paddingRight: 115 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 6 }, name: { fontSize: 25, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 13, marginTop: 3 },
+  identity: { marginTop: spacing.md, paddingRight: 115 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 6 }, name: { fontSize: 25, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 13, marginTop: 3 }, profileBio: { color: colors.onSurfaceSecondary, fontSize: 13, lineHeight: 18, marginTop: 9, maxWidth: 250 },
   editButton: { position: "absolute", right: spacing.xl, bottom: spacing.xl, borderWidth: 1.5, borderColor: colors.brandPrimary, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 }, editText: { color: colors.brandPrimary, fontWeight: "800", fontSize: 13 },
   verifyCard: { margin: spacing.xl, marginBottom: 0, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandTertiary },
   verifyTitle: { fontWeight: "800", color: colors.onBrandTertiary }, verifySub: { fontSize: 12, color: colors.onBrandTertiary, opacity: .75, marginTop: 2 }, verifyAction: { fontWeight: "800", color: colors.brandPrimary },
