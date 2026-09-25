@@ -180,6 +180,9 @@ class PostCreateBody(BaseModel):
     image_url: Optional[str] = None
     event_id: Optional[str] = None
     circle_id: Optional[str] = None
+    plan_time: Optional[datetime] = None
+    place_name: Optional[str] = Field(default=None, max_length=160)
+    capacity: Optional[int] = Field(default=None, ge=2, le=100)
 
 
 class ReportBody(BaseModel):
@@ -575,6 +578,10 @@ def _decorate_posts(posts: List[dict]) -> List[dict]:
         users = {u["id"]: public_user(u) for u in (result.data or [])}
     for post in posts:
         post["author"] = users.get(post.get("user_id"))
+        interested = supabase.table("post_interest").select("user_id").eq("post_id", post["id"]).limit(101).execute()
+        interest_ids = [r["user_id"] for r in (interested.data or [])]
+        post["interest_count"] = len(interest_ids)
+        post["interest_user_ids"] = interest_ids
     return posts
 
 
@@ -602,6 +609,10 @@ async def create_post(body: PostCreateBody, user: dict = Depends(current_user)):
         "image_url": body.image_url,
         "event_id": body.event_id,
         "circle_id": body.circle_id,
+        "plan_time": body.plan_time.isoformat() if body.plan_time else None,
+        "place_name": body.place_name,
+        "capacity": body.capacity,
+        "expires_at": (body.plan_time + timedelta(hours=6)).isoformat() if body.plan_time and body.intent in {"anyone_down", "looking_for_people"} else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     supabase.table("posts").insert(post).execute()
@@ -618,6 +629,54 @@ async def list_posts(user: dict = Depends(current_user), user_id: Optional[str] 
     if user_id != user["id"]:
         posts = [p for p in posts if p.get("audience") == "campus"]
     return {"posts": _decorate_posts(posts)}
+
+
+
+@api.post("/posts/{post_id}/interest")
+async def toggle_post_interest(post_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("posts").select("*").eq("id", post_id).limit(1).execute()
+    post = result.data[0] if result.data else None
+    if not post:
+        raise HTTPException(404, "Post not found")
+    if post.get("expires_at") and datetime.fromisoformat(post["expires_at"].replace("Z", "+00:00")) < datetime.now(timezone.utc):
+        raise HTTPException(400, "This plan has ended")
+    existing = supabase.table("post_interest").select("user_id").eq("post_id", post_id).eq("user_id", user["id"]).limit(1).execute()
+    if existing.data:
+        supabase.table("post_interest").delete().eq("post_id", post_id).eq("user_id", user["id"]).execute()
+        joined = False
+    else:
+        if post.get("capacity"):
+            count_result = supabase.table("post_interest").select("user_id", count="exact").eq("post_id", post_id).execute()
+            if (count_result.count or 0) >= post["capacity"]:
+                raise HTTPException(409, "This plan is full")
+        supabase.table("post_interest").insert({"post_id": post_id, "user_id": user["id"]}).execute()
+        joined = True
+    return {"interested": joined}
+
+
+@api.get("/posts/{post_id}/replies")
+async def list_post_replies(post_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("post_replies").select("*").eq("post_id", post_id).order("created_at").limit(200).execute()
+    replies = result.data or []
+    user_ids = list({r["user_id"] for r in replies})
+    users = {}
+    if user_ids:
+        ur = supabase.table("users").select("*").in_("id", user_ids).execute()
+        users = {u["id"]: public_user(u) for u in (ur.data or [])}
+    for reply in replies:
+        reply["author"] = users.get(reply["user_id"])
+    return {"replies": replies}
+
+
+@api.post("/posts/{post_id}/replies")
+async def create_post_reply(post_id: str, body: MessageBody, user: dict = Depends(current_user)):
+    post_result = supabase.table("posts").select("id").eq("id", post_id).limit(1).execute()
+    if not post_result.data:
+        raise HTTPException(404, "Post not found")
+    reply = {"id": str(uuid.uuid4()), "post_id": post_id, "user_id": user["id"], "content": body.content.strip(), "created_at": datetime.now(timezone.utc).isoformat()}
+    supabase.table("post_replies").insert(reply).execute()
+    reply["author"] = public_user(user)
+    return {"reply": reply}
 
 
 @api.delete("/posts/{post_id}")
