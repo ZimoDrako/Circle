@@ -173,6 +173,15 @@ class MessageBody(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
 
 
+class PostCreateBody(BaseModel):
+    content: str = Field(min_length=1, max_length=1000)
+    intent: str = "post"
+    audience: str = "campus"
+    image_url: Optional[str] = None
+    event_id: Optional[str] = None
+    circle_id: Optional[str] = None
+
+
 class ReportBody(BaseModel):
     target_type: str  # user | event | circle
     target_id: str
@@ -552,6 +561,75 @@ async def list_users(user: dict = Depends(current_user), q: Optional[str] = Quer
     blocked = set(user.get("blocked") or [])
     users = [u for u in (result.data or []) if u.get("id") not in blocked]
     return {"users": [public_user(u) for u in users]}
+
+
+
+# ---------------------------------------------------------------------------
+# Routes: Posts
+# ---------------------------------------------------------------------------
+def _decorate_posts(posts: List[dict]) -> List[dict]:
+    user_ids = list({p.get("user_id") for p in posts if p.get("user_id")})
+    users = {}
+    if user_ids:
+        result = supabase.table("users").select("*").in_("id", user_ids).limit(200).execute()
+        users = {u["id"]: public_user(u) for u in (result.data or [])}
+    for post in posts:
+        post["author"] = users.get(post.get("user_id"))
+    return posts
+
+
+@api.post("/posts")
+async def create_post(body: PostCreateBody, user: dict = Depends(current_user)):
+    if body.intent not in {"post", "anyone_down", "looking_for_people", "question", "recommendation", "event"}:
+        raise HTTPException(400, "Invalid post type")
+    if body.audience not in {"campus", "connections"}:
+        raise HTTPException(400, "Invalid audience")
+    if body.circle_id:
+        circle_result = supabase.table("circles").select("id,member_ids,type").eq("id", body.circle_id).limit(1).execute()
+        circle = circle_result.data[0] if circle_result.data else None
+        if not circle or circle.get("type") in ("dm", "daily") or user["id"] not in (circle.get("member_ids") or []):
+            raise HTTPException(400, "That Circle cannot be linked")
+    if body.event_id:
+        event_result = supabase.table("events").select("id").eq("id", body.event_id).limit(1).execute()
+        if not event_result.data:
+            raise HTTPException(400, "Event not found")
+    post = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "content": body.content.strip(),
+        "intent": body.intent,
+        "audience": body.audience,
+        "image_url": body.image_url,
+        "event_id": body.event_id,
+        "circle_id": body.circle_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    supabase.table("posts").insert(post).execute()
+    return {"post": _decorate_posts([post])[0]}
+
+
+@api.get("/posts")
+async def list_posts(user: dict = Depends(current_user), user_id: Optional[str] = None):
+    query = supabase.table("posts").select("*")
+    if user_id:
+        query = query.eq("user_id", user_id)
+    result = query.order("created_at", desc=True).limit(100).execute()
+    posts = result.data or []
+    if user_id != user["id"]:
+        posts = [p for p in posts if p.get("audience") == "campus"]
+    return {"posts": _decorate_posts(posts)}
+
+
+@api.delete("/posts/{post_id}")
+async def delete_post(post_id: str, user: dict = Depends(current_user)):
+    result = supabase.table("posts").select("user_id").eq("id", post_id).limit(1).execute()
+    post = result.data[0] if result.data else None
+    if not post:
+        raise HTTPException(404, "Post not found")
+    if post["user_id"] != user["id"]:
+        raise HTTPException(403, "You can only delete your own posts")
+    supabase.table("posts").delete().eq("id", post_id).execute()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
