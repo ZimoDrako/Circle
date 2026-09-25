@@ -1,69 +1,44 @@
-// Design tokens for CIRCLE — mint/emerald brand from design_guidelines.json.
 import { useMemo } from "react";
-import { Appearance, StyleSheet, useColorScheme } from "react-native";
+import { StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type ColorScheme = "light" | "dark";
+export type AccentName = "green" | "blue" | "red" | "purple" | "gold" | "orange" | "pink" | "teal" | "indigo" | "slate";
 
-const light = {
-  surface: "#FFFFFF",
-  onSurface: "#09090B",
-  surfaceSecondary: "#F4F4F5",
-  onSurfaceSecondary: "#18181B",
-  surfaceTertiary: "#E4E4E7",
-  onSurfaceTertiary: "#27272A",
-  surfaceInverse: "#18181B",
-  onSurfaceInverse: "#FAFAFA",
-  muted: "#71717A",
-
-  brand: "#10B981",
-  onBrand: "#FFFFFF",
-  brandPrimary: "#10B981",
-  onBrandPrimary: "#FFFFFF",
-  brandSecondary: "#34D399",
-  onBrandSecondary: "#064E3B",
-  brandTertiary: "#D1FAE5",
-  onBrandTertiary: "#065F46",
-
-  success: "#10B981",
-  onSuccess: "#FFFFFF",
-  warning: "#F59E0B",
-  onWarning: "#FFFFFF",
-  error: "#EF4444",
-  onError: "#FFFFFF",
-  info: "#3F3F46",
-  onInfo: "#FFFFFF",
-
-  border: "#E4E4E7",
-  borderStrong: "#A1A1AA",
-  divider: "#F4F4F5",
+const accents: Record<AccentName, { primary: string; secondary: string; tertiary: string; onTertiary: string }> = {
+  green: { primary:"#10B981", secondary:"#34D399", tertiary:"#D1FAE5", onTertiary:"#065F46" },
+  blue: { primary:"#2563EB", secondary:"#60A5FA", tertiary:"#DBEAFE", onTertiary:"#1E40AF" },
+  red: { primary:"#DC2626", secondary:"#F87171", tertiary:"#FEE2E2", onTertiary:"#991B1B" },
+  purple: { primary:"#7C3AED", secondary:"#A78BFA", tertiary:"#EDE9FE", onTertiary:"#5B21B6" },
+  gold: { primary:"#B7791F", secondary:"#D69E2E", tertiary:"#FEF3C7", onTertiary:"#78350F" },
+  orange: { primary:"#EA580C", secondary:"#FB923C", tertiary:"#FFEDD5", onTertiary:"#9A3412" },
+  pink: { primary:"#DB2777", secondary:"#F472B6", tertiary:"#FCE7F3", onTertiary:"#9D174D" },
+  teal: { primary:"#0D9488", secondary:"#2DD4BF", tertiary:"#CCFBF1", onTertiary:"#115E59" },
+  indigo: { primary:"#4F46E5", secondary:"#818CF8", tertiary:"#E0E7FF", onTertiary:"#3730A3" },
+  slate: { primary:"#475569", secondary:"#94A3B8", tertiary:"#E2E8F0", onTertiary:"#334155" },
 };
 
-export type ThemeColors = typeof light;
-
-export const defaultScheme = "light" satisfies ColorScheme;
-export const themes: { light: ThemeColors; dark?: ThemeColors } = { light };
-
-export function setColorScheme(scheme: ColorScheme | null) {
-  Appearance.setColorScheme?.(scheme ?? "unspecified");
-}
-setColorScheme?.(themes.dark ? null : defaultScheme);
-
-export function useTheme(): { scheme: ColorScheme; colors: ThemeColors } {
-  const system = useColorScheme();
-  const scheme: ColorScheme = system === "dark" && themes.dark ? "dark" : "light";
-  return { scheme, colors: themes[scheme] ?? themes.light };
-}
-
-export function makeStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
-  factory: (colors: ThemeColors) => T & StyleSheet.NamedStyles<any>,
-): () => T {
-  return function useStyles(): T {
-    const { colors } = useTheme();
-    return useMemo(() => StyleSheet.create(factory(colors)), [colors]);
+function palette(scheme: ColorScheme, accent: AccentName) {
+  const a=accents[accent];
+  const dark=scheme==="dark";
+  return {
+    surface: dark?"#09090B":"#FFFFFF", onSurface: dark?"#FAFAFA":"#09090B",
+    surfaceSecondary: dark?"#18181B":"#F4F4F5", onSurfaceSecondary: dark?"#E4E4E7":"#18181B",
+    surfaceTertiary: dark?"#27272A":"#E4E4E7", onSurfaceTertiary: dark?"#D4D4D8":"#27272A",
+    surfaceInverse: dark?"#FAFAFA":"#18181B", onSurfaceInverse: dark?"#18181B":"#FAFAFA", muted: dark?"#A1A1AA":"#71717A",
+    brand:a.primary,onBrand:"#FFFFFF",brandPrimary:a.primary,onBrandPrimary:"#FFFFFF",brandSecondary:a.secondary,onBrandSecondary:dark?"#FFFFFF":a.onTertiary,
+    brandTertiary:dark?a.primary+"2E":a.tertiary,onBrandTertiary:dark?a.secondary:a.onTertiary,
+    success:"#10B981",onSuccess:"#FFFFFF",warning:"#F59E0B",onWarning:"#FFFFFF",error:"#EF4444",onError:"#FFFFFF",info:dark?"#D4D4D8":"#3F3F46",onInfo:dark?"#18181B":"#FFFFFF",
+    border:dark?"#27272A":"#E4E4E7",borderStrong:dark?"#52525B":"#A1A1AA",divider:dark?"#18181B":"#F4F4F5",
   };
 }
-
-export const colors = light;
-
-export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
-export const radius = { sm: 6, md: 12, lg: 20, pill: 999 };
+export type ThemeColors = ReturnType<typeof palette>;
+export const colors = palette("light","green");
+export const accentOptions = Object.keys(accents) as AccentName[];
+export async function loadDisplaySettings(){const [scheme,accent]=await Promise.all([AsyncStorage.getItem("circle.display.scheme"),AsyncStorage.getItem("circle.display.accent")]);return {scheme:(scheme==="dark"?"dark":"light") as ColorScheme,accent:((accent&&accent in accents)?accent:"green") as AccentName};}
+export async function saveDisplaySettings(scheme:ColorScheme,accent:AccentName){await Promise.all([AsyncStorage.setItem("circle.display.scheme",scheme),AsyncStorage.setItem("circle.display.accent",accent)]);}
+export function getThemeColors(scheme:ColorScheme,accent:AccentName){return palette(scheme,accent);}
+export function useTheme(){return {scheme:"light" as ColorScheme,colors};}
+export function makeStyles<T extends StyleSheet.NamedStyles<T>|StyleSheet.NamedStyles<any>>(factory:(colors:ThemeColors)=>T&StyleSheet.NamedStyles<any>){return function(){const {colors}=useTheme();return useMemo(()=>StyleSheet.create(factory(colors)),[colors]);};}
+export const spacing={xs:4,sm:8,md:12,lg:16,xl:24,xxl:32,xxxl:48};
+export const radius={sm:6,md:12,lg:20,pill:999};
