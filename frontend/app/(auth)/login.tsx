@@ -3,12 +3,14 @@ import { View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoidingView, Pla
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Button } from "@/src/ui";
 import { api, setToken } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 export default function Login() {
+  const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { refresh } = useAuth();
   const [email, setEmail] = useState("");
@@ -37,7 +39,7 @@ export default function Login() {
       <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} testID="login-back">
-            <Icon name="chevron-back" size={26} color={colors.onSurface} />
+            <Icon name="chevron-back" size={26} color={themeColors.onSurface} />
           </Pressable>
         </View>
         <View style={styles.body}>
@@ -52,7 +54,7 @@ export default function Login() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={themeColors.muted}
             style={styles.input}
           />
           <View style={{ height: spacing.md }} />
@@ -62,7 +64,7 @@ export default function Login() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={themeColors.muted}
             style={styles.input}
           />
 
@@ -80,7 +82,7 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   body: { padding: spacing.xl },
@@ -106,4 +108,4 @@ const styles = StyleSheet.create({
   },
   demoTitle: { fontWeight: "700", color: colors.onSurface, marginBottom: 4 },
   demoText: { fontSize: 12, color: colors.muted },
-});
+}));
