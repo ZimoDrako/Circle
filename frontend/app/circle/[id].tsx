@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Pla
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 import { useAuth } from "@/src/auth";
 
 export default function CircleChat() {
+  const { colors: themeColors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
@@ -118,7 +119,7 @@ export default function CircleChat() {
           <View style={{ flex: 1, marginLeft: spacing.sm }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={styles.title} numberOfLines={1}>{circle.name}</Text>
-              {circle.verified_only && <Icon name="shield-checkmark" size={14} color={colors.brandPrimary} />}
+              {circle.verified_only && <Icon name="shield-checkmark" size={14} color={themeColors.brandPrimary} />}
             </View>
             <Text style={styles.meta}>
               {circle.type === "dm"
@@ -151,7 +152,7 @@ export default function CircleChat() {
 
       {circle.event && (
         <View style={styles.eventPill}>
-          <Icon name="calendar" size={14} color={colors.brandPrimary} />
+          <Icon name="calendar" size={14} color={themeColors.brandPrimary} />
           <View style={{ flex: 1, marginLeft: spacing.sm }}>
             <Text style={styles.eventTitle} numberOfLines={1}>{circle.event.title}</Text>
             <Text style={styles.eventMeta}>{circle.event.date} · {circle.event.time} · {circle.event.location}</Text>
@@ -226,11 +227,11 @@ export default function CircleChat() {
             </View>
           ) : (
             <View style={styles.publicDetails}>
-              <View style={styles.publicDetailsIcon}><Icon name="people-circle-outline" size={36} color={colors.brandPrimary} /></View>
+              <View style={styles.publicDetailsIcon}><Icon name="people-circle-outline" size={36} color={themeColors.brandPrimary} /></View>
               <Text style={styles.publicDetailsTitle}>About this Circle</Text>
               <Text style={styles.publicDetailsMeta}>{(circle.member_ids || []).length} members</Text>
               {(circle.interests || []).length > 0 && <View style={styles.publicInterestWrap}>{circle.interests.slice(0, 6).map((interest: string) => <View key={interest} style={styles.publicInterest}><Text style={styles.publicInterestText}>{interest}</Text></View>)}</View>}
-              <View style={styles.privateChatNotice}><Icon name="lock-closed" size={18} color={colors.brandPrimary} /><View style={{ flex: 1 }}><Text style={styles.privateChatTitle}>Conversation is private</Text><Text style={styles.privateChatText}>Only members of this Circle can read messages or participate in the group chat.</Text></View></View>
+              <View style={styles.privateChatNotice}><Icon name="lock-closed" size={18} color={themeColors.brandPrimary} /><View style={{ flex: 1 }}><Text style={styles.privateChatTitle}>Conversation is private</Text><Text style={styles.privateChatText}>Only members of this Circle can read messages or participate in the group chat.</Text></View></View>
             </View>
           )
         }
@@ -285,7 +286,7 @@ export default function CircleChat() {
               onSubmitEditing={send}
             />
             <Pressable onPress={send} style={styles.sendBtn} testID="circle-send">
-              <Icon name="arrow-up" size={18} color={colors.onBrandPrimary} />
+              <Icon name="arrow-up" size={18} color={themeColors.onBrandPrimary} />
             </Pressable>
           </View>
         </SafeAreaView>
