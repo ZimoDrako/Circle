@@ -116,7 +116,7 @@ export default function CircleChat() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
       <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.surface }}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.replace("/(tabs)/circles")} testID="circle-back"><Icon name="chevron-back" size={26} color={colors.onSurface} /></Pressable>
+          <Pressable onPress={() => router.replace("/(tabs)/circles")} testID="circle-back"><Icon name="chevron-back" size={26} color={themeColors.onSurface} /></Pressable>
           <View style={{ flex: 1, marginLeft: spacing.sm }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={styles.title} numberOfLines={1}>{circle.name}</Text>
@@ -223,7 +223,7 @@ export default function CircleChat() {
         ListEmptyComponent={
           circle.is_member ? (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
-              <Icon name="chatbubbles-outline" size={40} color={colors.muted} />
+              <Icon name="chatbubbles-outline" size={40} color={themeColors.muted} />
               <Text style={{ color: colors.muted, marginTop: 12 }}>Say hi to your new Circle</Text>
             </View>
           ) : (
@@ -268,7 +268,7 @@ export default function CircleChat() {
 
       {circle.is_member && circle.type === "daily" && circle.daily_status === "expired" ? (
         <SafeAreaView edges={["bottom"]} style={styles.endedWrap}>
-          <Icon name="time-outline" size={18} color={colors.muted} />
+          <Icon name="time-outline" size={18} color={themeColors.muted} />
           <View style={{ flex: 1 }}>
             <Text style={styles.endedTitle}>This Daily Circle has ended</Text>
             <Text style={styles.endedMeta}>You can still view the chat and member profiles, but new messages are turned off.</Text>
@@ -302,7 +302,7 @@ export default function CircleChat() {
         <SafeAreaView style={styles.membersPage}>
           <View style={styles.membersHeader}>
             <Pressable onPress={() => setMembersOpen(false)} style={styles.membersClose} testID="circle-members-close">
-              <Icon name="close" size={22} color={colors.onSurface} />
+              <Icon name="close" size={22} color={themeColors.onSurface} />
             </Pressable>
             <Text style={styles.membersTitle}>Circle members</Text>
           </View>
@@ -323,7 +323,7 @@ export default function CircleChat() {
                   <Text style={styles.memberName}>{m.first_name}{m.id === user?.id ? " (You)" : ""}</Text>
                   <Text style={styles.memberMeta}>{[m.major, m.year].filter(Boolean).join(" · ") || "Circle member"}</Text>
                 </View>
-                <Icon name="chevron-forward" size={20} color={colors.muted} />
+                <Icon name="chevron-forward" size={20} color={themeColors.muted} />
               </Pressable>
             )}
           />
