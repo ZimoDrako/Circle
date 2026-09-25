@@ -14,7 +14,7 @@ const intents = [
 
 export default function CreatePost() {
   const { colors: themeColors } = useTheme();
-  const styles = useStyles();
+  const s = useStyles();
  const router=useRouter(); const [content,setContent]=useState(""); const [intent,setIntent]=useState("post");
  const [audience,setAudience]=useState<"campus"|"connections">("campus"); const [busy,setBusy]=useState(false);
  const [place,setPlace]=useState(""); const [planDay,setPlanDay]=useState<0|1>(0); const [planHour,setPlanHour]=useState<number|null>(null); const [capacity,setCapacity]=useState("");
