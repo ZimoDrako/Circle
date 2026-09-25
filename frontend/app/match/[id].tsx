@@ -54,7 +54,7 @@ export default function MatchDetail() {
   const conn = data.connection ?? { status: "none" };
   const sharedNorm = new Set((data.shared_interests || []).map((x: string) => x.trim().toLowerCase()));
   const sortedInterests = [...(u.interests || [])].sort((a: string, b: string) => Number(sharedNorm.has(b.trim().toLowerCase())) - Number(sharedNorm.has(a.trim().toLowerCase())));
-  const preview = sortedInterests.slice(0, 5);
+  const preview = sortedInterests.slice(0, 4);
 
   const onConnect = async () => {
     setConnecting(true);
@@ -79,9 +79,10 @@ export default function MatchDetail() {
           <View style={styles.identity}>
             <View style={styles.nameRow}><Text style={styles.name}>{u.first_name} {u.last_name}</Text>{u.verified && <Icon name="checkmark-circle" size={20} color={colors.brandPrimary} />}</View>
             <Text style={styles.meta}>{u.university || "Student"}</Text>
-            <Text style={styles.meta}>{[u.major, u.year].filter(Boolean).join(" · ")}</Text>
+            <Text style={styles.meta}>{[u.major, u.year].filter(Boolean).join(" · ") || "Student"}</Text>
+            <Text style={styles.profileBio}>{u.bio || `${u.first_name} hasn't added a bio yet.`}</Text>
           </View>
-          <View style={styles.matchRing}><Text style={styles.matchScore}>{data.compatibility}%</Text><Text style={styles.matchLabel}>Match</Text></View>
+          <View style={styles.matchBadge}><Text style={styles.matchScore}>{data.compatibility}%</Text><Text style={styles.matchLabel}>Match</Text></View>
         </View>
 
         <View style={styles.actions}>
@@ -89,10 +90,15 @@ export default function MatchDetail() {
           {conn.status !== "connected" && <Button label="Maybe later" variant="secondary" onPress={() => router.back()} style={{ flex: 1 }} testID="match-later" />}
         </View>
 
-        <Pressable style={styles.connectionRow} onPress={() => setConnectionsOpen(true)}>
-          <View style={styles.connectionLeft}><Icon name="people-outline" size={20} color={colors.brandPrimary} /><Text style={styles.connectionCount}>{data.connection_count || 0}</Text><Text style={styles.connectionText}>Connections</Text></View>
-          <Icon name="chevron-forward" size={19} color={colors.brandPrimary} />
-        </Pressable>
+        <View style={styles.metrics}>
+          <Pressable style={styles.metric} onPress={() => setConnectionsOpen(true)}>
+            <Text style={styles.metricNum}>{data.connection_count || 0}</Text><Text style={styles.metricLabel}>Connections</Text>
+          </Pressable>
+          <View style={styles.metricDivider} />
+          <Pressable style={styles.metric} onPress={() => setProfileTab("circles")}>
+            <Text style={styles.metricNum}>{data.circle_count || 0}</Text><Text style={styles.metricLabel}>Circles</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.profileTabs}>
           <Pressable style={styles.profileTab} onPress={() => setProfileTab("about")}>
@@ -106,7 +112,7 @@ export default function MatchDetail() {
         </View>
 
         {profileTab === "about" && <>
-        <View style={styles.card}>
+        <View style={styles.plainSection}>
           <Text style={styles.cardTitle}>About me</Text>
           <Text style={styles.bio}>{u.bio || `${u.first_name} hasn't added a bio yet.`}</Text>
           <View style={styles.detailRow}>
@@ -115,12 +121,12 @@ export default function MatchDetail() {
           </View>
         </View>
 
-        <Pressable style={styles.card} onPress={() => setInterestsOpen(true)}>
+        <Pressable style={styles.plainSection} onPress={() => setInterestsOpen(true)}>
           <View style={styles.cardHeader}>
             <View><Text style={styles.cardTitle}>Interests</Text><Text style={styles.cardSub}>{data.shared_interests?.length || 0} in common · {u.interests?.length || 0} total</Text></View>
             <Icon name="chevron-forward" size={20} color={colors.brandPrimary} />
           </View>
-          <View style={styles.interestGrid}>{preview.map((i: string) => { const shared = sharedNorm.has(i.trim().toLowerCase()); return <View key={i} style={styles.interestTile}><View style={[styles.interestEmblem, shared && styles.interestShared]}><Icon name={interestIcon(i) as any} size={20} color={shared ? colors.onBrandPrimary : colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text>{shared && <Text style={styles.sharedLabel}>Both</Text>}</View>; })}{sortedInterests.length > 5 && <View style={styles.interestTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{sortedInterests.length - 5}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
+          <View style={styles.previewRow}>{preview.map((i: string) => { const shared = sharedNorm.has(i.trim().toLowerCase()); return <View key={i} style={styles.previewTile}><View style={[styles.interestEmblem, shared && styles.interestShared]}><Icon name={interestIcon(i) as any} size={20} color={shared ? colors.onBrandPrimary : colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text>{shared && <Text style={styles.sharedLabel}>Both</Text>}</View>; })}{sortedInterests.length > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{sortedInterests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
         </Pressable>
 
         <View style={styles.youTwo}>
@@ -129,7 +135,7 @@ export default function MatchDetail() {
           {!(data.reasons || []).length && <Text style={styles.bio}>As you use Circle, we'll show more about why you match here.</Text>}
         </View>
 
-        {(u.looking_for || []).length > 0 && <View style={styles.compactCard}><Icon name="search-outline" size={18} color={colors.brandPrimary} /><Text style={styles.compactTitle}>Looking for</Text><Text numberOfLines={1} style={styles.compactValue}>{u.looking_for.join(", ")}</Text></View>}
+        {(u.looking_for || []).length > 0 && <View style={styles.plainSection}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View><View style={styles.lookingWrap}>{u.looking_for.map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View></View>}
         </>}
 
         {profileTab === "circles" && <View style={styles.circlesSection}>
@@ -171,16 +177,17 @@ export default function MatchDetail() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface }, safeTop: { backgroundColor: colors.surface }, loading: { padding: 24, color: colors.muted },
   header: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }, headerBtn: { padding: 6 }, headerTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
-  content: { paddingBottom: 36 }, hero: { minHeight: 300, paddingHorizontal: spacing.xl, paddingTop: 150, paddingBottom: spacing.xl, backgroundColor: colors.surface, overflow: "hidden", flexDirection: "row", alignItems: "flex-end", gap: spacing.md },
-  banner: { position: "absolute", top: 0, left: 0, right: 0, height: 185, backgroundColor: colors.brandTertiary }, bannerImage: { width: "100%", height: "100%" }, bannerFallback: { flex: 1, backgroundColor: colors.brandTertiary }, identity: { flex: 1, paddingBottom: 5 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }, name: { fontSize: 23, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 12, marginTop: 3 },
-  matchRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: colors.brandPrimary, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 4 }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 18 }, matchLabel: { color: colors.muted, fontWeight: "700", fontSize: 10 },
-  actions: { flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.xl }, connectionRow: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, connectionLeft: { flexDirection: "row", alignItems: "center", gap: 7 }, connectionCount: { fontWeight: "900", color: colors.onSurface, fontSize: 15 }, connectionText: { color: colors.muted, fontSize: 14 },
+  content: { paddingBottom: 36 }, hero: { minHeight: 300, paddingHorizontal: spacing.xl, paddingTop: 150, paddingBottom: spacing.xl, backgroundColor: colors.surface, overflow: "hidden" },
+  banner: { position: "absolute", top: 0, left: 0, right: 0, height: 185, backgroundColor: colors.brandTertiary }, bannerImage: { width: "100%", height: "100%" }, bannerFallback: { flex: 1, backgroundColor: colors.brandTertiary }, identity: { marginTop: spacing.md, paddingRight: 92 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }, name: { fontSize: 25, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 13, marginTop: 3 }, profileBio: { color: colors.onSurfaceSecondary, fontSize: 13, lineHeight: 18, marginTop: 9, maxWidth: 255 },
+  matchBadge: { position: "absolute", right: spacing.xl, bottom: spacing.xl, width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: colors.brandPrimary, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 17 }, matchLabel: { color: colors.muted, fontWeight: "700", fontSize: 10 },
+  actions: { flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.xl }, metrics: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", paddingVertical: spacing.md, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.divider }, metric: { flex: 1, alignItems: "center" }, metricNum: { color: colors.onSurface, fontSize: 18, fontWeight: "900" }, metricLabel: { color: colors.muted, fontSize: 11, marginTop: 2 }, metricDivider: { width: 1, height: 28, backgroundColor: colors.divider },
   profileTabs: { flexDirection: "row", marginTop: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { color: colors.muted, fontSize: 13, fontWeight: "800" }, profileTabTextActive: { color: colors.onSurface }, profileTabLine: { position: "absolute", left: "24%", right: "24%", bottom: -1, height: 2, borderRadius: 2, backgroundColor: colors.brandPrimary },
-  card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }, cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { color: colors.onSurface, fontWeight: "800", fontSize: 17 }, cardSub: { color: colors.muted, fontSize: 12, marginTop: 2 }, bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
+  plainSection: { marginHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }, cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { color: colors.onSurface, fontWeight: "800", fontSize: 17 }, cardSub: { color: colors.muted, fontSize: 12, marginTop: 2 }, bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
   detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
-  interestGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: spacing.md }, interestTile: { width: "30%", minWidth: 86, alignItems: "center", gap: 5, paddingVertical: 8 }, interestEmblem: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, interestShared: { backgroundColor: colors.brandPrimary }, interestName: { color: colors.onSurface, fontSize: 11, fontWeight: "700", maxWidth: 88, textAlign: "center" }, sharedLabel: { color: colors.brandPrimary, fontSize: 9, fontWeight: "900", textTransform: "uppercase" }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
+  previewRow: { flexDirection: "row", justifyContent: "space-between", gap: 3, marginTop: spacing.md }, previewTile: { flex: 1, minWidth: 0, maxWidth: "20%", alignItems: "center", gap: 5, paddingVertical: 4 }, interestGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: spacing.md }, interestTile: { width: "30%", minWidth: 86, alignItems: "center", gap: 5, paddingVertical: 8 }, interestEmblem: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, interestShared: { backgroundColor: colors.brandPrimary }, interestName: { color: colors.onSurface, fontSize: 11, fontWeight: "700", maxWidth: 88, textAlign: "center" }, sharedLabel: { color: colors.brandPrimary, fontSize: 9, fontWeight: "900", textTransform: "uppercase" }, more: { minWidth: 42, height: 34, paddingHorizontal: 10, borderRadius: 17, borderWidth: 1, borderColor: colors.borderStrong, alignItems: "center", justifyContent: "center" }, moreText: { color: colors.onSurface, fontWeight: "800", fontSize: 12 },
   youTwo: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.brandTertiary }, youTitle: { flexDirection: "row", alignItems: "center", gap: 7 }, youScore: { color: colors.brandPrimary, fontSize: 14, fontWeight: "900" }, reason: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md }, reasonText: { color: colors.onBrandTertiary, fontSize: 13, flex: 1 },
+  lookingWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: spacing.md }, lookingTag: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: radius.pill }, lookingTag0: { backgroundColor: "#E8F1FF" }, lookingTag1: { backgroundColor: "#F0E9FF" }, lookingTag2: { backgroundColor: "#FFE9EF" }, lookingTag3: { backgroundColor: "#E8F7EF" }, lookingTag4: { backgroundColor: "#FFF0F3" }, lookingText: { color: colors.onSurfaceSecondary, fontSize: 12, fontWeight: "700" },
   compactCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary }, compactTitle: { color: colors.onSurface, fontWeight: "800" }, compactValue: { color: colors.muted, fontSize: 12, flex: 1, textAlign: "right" }, pending: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandTertiary }, pendingText: { color: colors.onBrandTertiary, fontWeight: "700", flex: 1 },
   circlesSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, gap: spacing.sm }, circleEmpty: { alignItems: "center", paddingVertical: 48, paddingHorizontal: spacing.xl }, circleEmptyTitle: { marginTop: spacing.md, color: colors.onSurface, fontSize: 17, fontWeight: "900" }, circleEmptyText: { marginTop: 6, color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: "center" }, circleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, circleIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandTertiary }, circleName: { color: colors.onSurface, fontSize: 15, fontWeight: "900" }, circleMeta: { color: colors.muted, fontSize: 12, marginTop: 3 }, privateBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, privateBadgeText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
   modalRoot: { flex: 1, backgroundColor: colors.surface }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider }, modalTitle: { fontSize: 22, fontWeight: "900", color: colors.onSurface }, modalContent: { padding: spacing.xl, paddingBottom: 50 }, empty: { color: colors.muted, textAlign: "center", marginTop: spacing.xxxl }, personRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.divider }, personName: { color: colors.onSurface, fontSize: 15, fontWeight: "800" }, personMeta: { color: colors.muted, fontSize: 12, marginTop: 3 },
