@@ -119,6 +119,11 @@ export const api = {
 
   listClubs: () => req("/clubs"),
   getClub: (id: string) => req(`/clubs/${id}`),
+  createClub: (body: any) => req("/clubs", { method: "POST", body: JSON.stringify(body) }),
+  joinClub: (id: string) => req(`/clubs/${id}/join`, { method: "POST" }),
+  leaveClub: (id: string) => req(`/clubs/${id}/leave`, { method: "POST" }),
+  getClubChat: (id: string) => req(`/clubs/${id}/chat`, { method: "POST" }),
+  getUserClubs: (id: string) => req(`/users/${id}/clubs`),
 
   report: (body: any) => req("/reports", { method: "POST", body: JSON.stringify(body) }),
   block: (userId: string) => req(`/block/${userId}`, { method: "POST" }),
