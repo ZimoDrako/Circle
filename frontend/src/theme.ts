@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -38,7 +38,16 @@ export const accentOptions = Object.keys(accents) as AccentName[];
 export async function loadDisplaySettings(){const [scheme,accent]=await Promise.all([AsyncStorage.getItem("circle.display.scheme"),AsyncStorage.getItem("circle.display.accent")]);return {scheme:(scheme==="dark"?"dark":"light") as ColorScheme,accent:((accent&&accent in accents)?accent:"green") as AccentName};}
 export async function saveDisplaySettings(scheme:ColorScheme,accent:AccentName){await Promise.all([AsyncStorage.setItem("circle.display.scheme",scheme),AsyncStorage.setItem("circle.display.accent",accent)]);}
 export function getThemeColors(scheme:ColorScheme,accent:AccentName){return palette(scheme,accent);}
-export function useTheme(){return {scheme:"light" as ColorScheme,colors};}
+type ThemeCtx={scheme:ColorScheme;accent:AccentName;colors:ThemeColors;setDisplay:(scheme:ColorScheme,accent:AccentName)=>Promise<void>;ready:boolean};
+const ThemeContext=createContext<ThemeCtx>({scheme:"light",accent:"green",colors,ready:false,setDisplay:async()=>{}});
+export function ThemeProvider({children}:{children:React.ReactNode}){
+ const [scheme,setScheme]=useState<ColorScheme>("light"); const [accent,setAccent]=useState<AccentName>("green"); const [ready,setReady]=useState(false);
+ useEffect(()=>{loadDisplaySettings().then(x=>{setScheme(x.scheme);setAccent(x.accent);setReady(true);});},[]);
+ const setDisplay=async(s:ColorScheme,a:AccentName)=>{setScheme(s);setAccent(a);await saveDisplaySettings(s,a);};
+ const value=useMemo(()=>({scheme,accent,colors:palette(scheme,accent),setDisplay,ready}),[scheme,accent,ready]);
+ return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+export function useTheme(){return useContext(ThemeContext);}
 export function makeStyles<T extends StyleSheet.NamedStyles<T>|StyleSheet.NamedStyles<any>>(factory:(colors:ThemeColors)=>T&StyleSheet.NamedStyles<any>){return function(){const {colors}=useTheme();return useMemo(()=>StyleSheet.create(factory(colors)),[colors]);};}
 export const spacing={xs:4,sm:8,md:12,lg:16,xl:24,xxl:32,xxxl:48};
 export const radius={sm:6,md:12,lg:20,pill:999};
