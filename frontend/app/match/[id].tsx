@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image } from "react-native";
-import Svg, { Circle as SvgCircle } from "react-native-svg";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
@@ -91,12 +90,13 @@ export default function MatchDetail() {
             <Text style={styles.profileBio}>{u.bio || `${u.first_name} hasn't added a bio yet.`}</Text>
           </View>
           <Pressable style={styles.matchBadge} onPress={() => setMatchOpen(true)} testID="match-score">
-            <Svg width={82} height={82} style={styles.matchProgress}>
-              <SvgCircle cx={41} cy={41} r={35} fill="none" stroke={colors.brandTertiary} strokeWidth={7} />
-              <SvgCircle cx={41} cy={41} r={35} fill="none" stroke={colors.brandPrimary} strokeWidth={7} strokeLinecap="round" strokeDasharray={219.9} strokeDashoffset={219.9 * (1 - Math.max(0, Math.min(100, data.compatibility || 0)) / 100)} transform="rotate(-90 41 41)" />
-            </Svg>
-            <Text style={styles.matchScore}>{data.compatibility}%</Text>
-            <Text style={styles.matchLabel}>Match</Text>
+            <View style={styles.matchTrack}>
+              <View style={[styles.matchFill, { height: `${Math.max(0, Math.min(100, data.compatibility || 0))}%` }]} />
+            </View>
+            <View style={styles.matchInner}>
+              <Text style={styles.matchScore}>{data.compatibility}%</Text>
+              <Text style={styles.matchLabel}>Match</Text>
+            </View>
           </Pressable>
         </View>
 
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   header: { height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg }, headerBtn: { padding: 6 }, headerTitle: { fontSize: 16, fontWeight: "800", color: colors.onSurface },
   content: { paddingBottom: 36 }, hero: { minHeight: 300, paddingHorizontal: spacing.xl, paddingTop: 150, paddingBottom: spacing.xl, backgroundColor: colors.surface, overflow: "hidden" },
   banner: { position: "absolute", top: 0, left: 0, right: 0, height: 185, backgroundColor: colors.brandTertiary }, bannerImage: { width: "100%", height: "100%" }, bannerFallback: { flex: 1, backgroundColor: colors.brandTertiary }, identity: { marginTop: spacing.md, paddingRight: 92 }, nameRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }, name: { fontSize: 25, fontWeight: "900", color: colors.onSurface }, meta: { color: colors.muted, fontSize: 13, marginTop: 3 }, profileBio: { color: colors.onSurfaceSecondary, fontSize: 13, lineHeight: 18, marginTop: 9, maxWidth: 255 },
-  matchBadge: { position: "absolute", right: spacing.xl, bottom: spacing.xl, width: 82, height: 82, borderRadius: 41, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }, matchProgress: { position: "absolute", top: 0, left: 0 }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 17 }, matchLabel: { color: colors.muted, fontWeight: "800", fontSize: 9, marginTop: 1 },
+  matchBadge: { position: "absolute", right: spacing.xl, bottom: spacing.xl, width: 82, height: 82, borderRadius: 41, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 }, matchTrack: { ...StyleSheet.absoluteFillObject, borderRadius: 41, overflow: "hidden", backgroundColor: colors.brandTertiary, justifyContent: "flex-end" }, matchFill: { width: "100%", backgroundColor: colors.brandPrimary }, matchInner: { width: 68, height: 68, borderRadius: 34, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, matchScore: { color: colors.onSurface, fontWeight: "900", fontSize: 17 }, matchLabel: { color: colors.muted, fontWeight: "800", fontSize: 9, marginTop: 1 },
   actions: { flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.xl }, metrics: { marginHorizontal: spacing.xl, marginTop: spacing.lg, flexDirection: "row", alignItems: "center", paddingVertical: spacing.md, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.divider }, metric: { flex: 1, alignItems: "center" }, metricNum: { color: colors.onSurface, fontSize: 18, fontWeight: "900" }, metricLabel: { color: colors.muted, fontSize: 11, marginTop: 2 }, metricDivider: { width: 1, height: 28, backgroundColor: colors.divider },
   profileTabs: { flexDirection: "row", marginTop: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { color: colors.muted, fontSize: 13, fontWeight: "800" }, profileTabTextActive: { color: colors.onSurface }, profileTabLine: { position: "absolute", left: "24%", right: "24%", bottom: -1, height: 2, borderRadius: 2, backgroundColor: colors.brandPrimary },
   plainSection: { marginHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider }, card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }, cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { color: colors.onSurface, fontWeight: "800", fontSize: 17 }, cardSub: { color: colors.muted, fontSize: 12, marginTop: 2 }, bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
