@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image } from "rea
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme } from "@/src/theme";
 import { Avatar, Button, Chip } from "@/src/ui";
 import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function MatchDetail() {
+  const { colors: themeColors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [data, setData] = useState<any>(null);
@@ -84,7 +85,7 @@ export default function MatchDetail() {
           <View style={styles.banner}>{u.banner_image_url ? <Image source={{ uri: u.banner_image_url }} style={styles.bannerImage} /> : <View style={styles.bannerFallback} />}</View>
           <Avatar uri={u.profile_photo_url} name={u.first_name} size={108} />
           <View style={styles.identity}>
-            <View style={styles.nameRow}><Text style={styles.name}>{u.first_name} {u.last_name}</Text>{u.verified && <Icon name="checkmark-circle" size={20} color={colors.brandPrimary} />}</View>
+            <View style={styles.nameRow}><Text style={styles.name}>{u.first_name} {u.last_name}</Text>{u.verified && <Icon name="checkmark-circle" size={20} color={themeColors.brandPrimary} />}</View>
             <Text style={styles.meta}>{u.university || "Student"}</Text>
             <Text style={styles.meta}>{[u.major, u.year].filter(Boolean).join(" · ") || "Student"}</Text>
             <Text style={styles.profileBio}>{u.bio || `${u.first_name} hasn't added a bio yet.`}</Text>
@@ -127,18 +128,18 @@ export default function MatchDetail() {
         <Pressable style={styles.plainSection} onPress={() => setInterestsOpen(true)}>
           <View style={styles.cardHeader}>
             <View><Text style={styles.cardTitle}>Interests</Text><Text style={styles.cardSub}>{data.shared_interests?.length || 0} in common · {u.interests?.length || 0} total</Text></View>
-            <Icon name="chevron-forward" size={20} color={colors.brandPrimary} />
+            <Icon name="chevron-forward" size={20} color={themeColors.brandPrimary} />
           </View>
           <View style={styles.previewRow}>{preview.map((i: string) => { const shared = sharedNorm.has(i.trim().toLowerCase()); return <View key={i} style={styles.previewTile}><View style={[styles.interestEmblem, shared && styles.interestShared]}><Icon name={interestIcon(i) as any} size={20} color={shared ? colors.onBrandPrimary : colors.brandPrimary} /></View><Text numberOfLines={1} style={styles.interestName}>{i}</Text>{shared && <Text style={styles.sharedLabel}>Both</Text>}</View>; })}{sortedInterests.length > 4 && <View style={styles.previewTile}><View style={styles.interestEmblem}><Text style={styles.moreText}>+{sortedInterests.length - 4}</Text></View><Text style={styles.interestName}>More</Text></View>}</View>
         </Pressable>
 
-        {(u.looking_for || []).length > 0 && <View style={styles.plainSection}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={colors.brandPrimary} /></View><View style={styles.lookingWrap}>{u.looking_for.map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View></View>}
+        {(u.looking_for || []).length > 0 && <View style={styles.plainSection}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Looking for</Text><Icon name="search-outline" size={18} color={themeColors.brandPrimary} /></View><View style={styles.lookingWrap}>{u.looking_for.map((item: string, i: number) => <View key={item} style={[styles.lookingTag, styles[`lookingTag${i % 5}` as keyof typeof styles] as any]}><Text style={styles.lookingText}>{item}</Text></View>)}</View></View>}
         </>}
 
         {profileTab === "events" && <View style={styles.circlesSection}>
-          {events.length === 0 ? <View style={styles.circleEmpty}><Icon name="calendar-outline" size={38} color={colors.brandPrimary} /><Text style={styles.circleEmptyTitle}>No events shown</Text><Text style={styles.circleEmptyText}>{u.first_name} hasn't created any events yet.</Text></View> : events.map((event: any) => (
+          {events.length === 0 ? <View style={styles.circleEmpty}><Icon name="calendar-outline" size={38} color={themeColors.brandPrimary} /><Text style={styles.circleEmptyTitle}>No events shown</Text><Text style={styles.circleEmptyText}>{u.first_name} hasn't created any events yet.</Text></View> : events.map((event: any) => (
             <Pressable key={event.id} style={styles.circleRow} onPress={() => router.push(`/event/${event.id}`)}>
-              <View style={styles.circleIcon}><Icon name="calendar" size={21} color={colors.brandPrimary} /></View>
+              <View style={styles.circleIcon}><Icon name="calendar" size={21} color={themeColors.brandPrimary} /></View>
               <View style={{ flex: 1 }}><Text style={styles.circleName}>{event.title}</Text><Text numberOfLines={1} style={styles.circleMeta}>{[event.date, event.time, event.location].filter(Boolean).join(" · ")}</Text></View>
               <Icon name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
@@ -146,7 +147,7 @@ export default function MatchDetail() {
         </View>}
 
         {profileTab === "posts" && <View style={styles.circlesSection}>
-          {posts.length === 0 ? <View style={styles.circleEmpty}><Icon name="chatbubble-ellipses-outline" size={38} color={colors.brandPrimary} /><Text style={styles.circleEmptyTitle}>No posts yet</Text><Text style={styles.circleEmptyText}>{u.first_name} hasn't posted anything visible to you.</Text></View> : posts.map((post: any) => (
+          {posts.length === 0 ? <View style={styles.circleEmpty}><Icon name="chatbubble-ellipses-outline" size={38} color={themeColors.brandPrimary} /><Text style={styles.circleEmptyTitle}>No posts yet</Text><Text style={styles.circleEmptyText}>{u.first_name} hasn't posted anything visible to you.</Text></View> : posts.map((post: any) => (
             <Pressable key={post.id} style={styles.postCard} onPress={() => router.push(`/post/${post.id}`)}>
               <View style={styles.postHead}><Avatar uri={u.profile_photo_url} name={u.first_name} size={38} /><View style={{ flex: 1 }}><Text style={styles.circleName}>{u.first_name} {u.last_name}</Text><Text style={styles.circleMeta}>{post.intent === "anyone_down" ? "Anyone down?" : post.intent === "looking_for_people" ? "Looking for people" : post.intent === "question" ? "Question" : post.intent === "recommendation" ? "Recommendation" : "Post"}</Text></View></View>
               <Text style={styles.postText}>{post.content}</Text>
@@ -157,31 +158,31 @@ export default function MatchDetail() {
         {profileTab === "circles" && <View style={styles.circlesSection}>
           {profileCircles.length === 0 ? (
             <View style={styles.circleEmpty}>
-              <Icon name="people-circle-outline" size={38} color={colors.brandPrimary} />
+              <Icon name="people-circle-outline" size={38} color={themeColors.brandPrimary} />
               <Text style={styles.circleEmptyTitle}>No Circles shown</Text>
               <Text style={styles.circleEmptyText}>{u.first_name} hasn't chosen any Circles to display on their profile.</Text>
             </View>
           ) : profileCircles.map((circle: any) => (
             <Pressable key={circle.id} style={styles.circleRow} onPress={() => router.push(`/circle/${circle.id}`)}>
-              <View style={styles.circleIcon}><Icon name="people" size={22} color={colors.brandPrimary} /></View>
+              <View style={styles.circleIcon}><Icon name="people" size={22} color={themeColors.brandPrimary} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.circleName}>{circle.name}</Text>
                 <Text numberOfLines={1} style={styles.circleMeta}>{(circle.interests || []).slice(0, 3).join(" · ") || `${(circle.member_ids || []).length} members`}</Text>
               </View>
-              <View style={styles.privateBadge}><Icon name="lock-closed-outline" size={13} color={colors.brandPrimary} /><Text style={styles.privateBadgeText}>Chat private</Text></View>
+              <View style={styles.privateBadge}><Icon name="lock-closed-outline" size={13} color={themeColors.brandPrimary} /><Text style={styles.privateBadgeText}>Chat private</Text></View>
               <Icon name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
           ))}
         </View>}
 
-        {conn.status === "pending_in" && <View style={styles.pending}><Icon name="mail-unread-outline" size={17} color={colors.brandPrimary} /><Text style={styles.pendingText}>{u.first_name} wants to connect with you</Text></View>}
+        {conn.status === "pending_in" && <View style={styles.pending}><Icon name="mail-unread-outline" size={17} color={themeColors.brandPrimary} /><Text style={styles.pendingText}>{u.first_name} wants to connect with you</Text></View>}
       </ScrollView>
 
       <Modal visible={matchOpen} transparent animationType="fade" onRequestClose={() => setMatchOpen(false)}>
         <Pressable style={styles.matchOverlay} onPress={() => setMatchOpen(false)}>
           <Pressable style={styles.matchSheet} onPress={() => {}}>
-            <View style={styles.matchSheetTop}><View style={styles.matchSheetIcon}><Icon name="sparkles" size={22} color={colors.brandPrimary} /></View><View style={{ flex: 1 }}><Text style={styles.matchSheetTitle}>{data.compatibility}% match</Text><Text style={styles.matchSheetSub}>Why you and {u.first_name} may click</Text></View><Pressable onPress={() => setMatchOpen(false)}><Icon name="close" size={24} color={colors.onSurface} /></Pressable></View>
-            {(data.reasons || []).slice(0, 5).map((reason: string, i: number) => <View key={i} style={styles.matchReason}><Icon name="checkmark-circle" size={18} color={colors.brandPrimary} /><Text style={styles.matchReasonText}>{reason}</Text></View>)}
+            <View style={styles.matchSheetTop}><View style={styles.matchSheetIcon}><Icon name="sparkles" size={22} color={themeColors.brandPrimary} /></View><View style={{ flex: 1 }}><Text style={styles.matchSheetTitle}>{data.compatibility}% match</Text><Text style={styles.matchSheetSub}>Why you and {u.first_name} may click</Text></View><Pressable onPress={() => setMatchOpen(false)}><Icon name="close" size={24} color={colors.onSurface} /></Pressable></View>
+            {(data.reasons || []).slice(0, 5).map((reason: string, i: number) => <View key={i} style={styles.matchReason}><Icon name="checkmark-circle" size={18} color={themeColors.brandPrimary} /><Text style={styles.matchReasonText}>{reason}</Text></View>)}
             {!(data.reasons || []).length && <Text style={styles.matchReasonText}>Circle will show more match reasons as you use the app.</Text>}
           </Pressable>
         </Pressable>
