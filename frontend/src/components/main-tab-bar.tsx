@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import Icon from "@react-native-vector-icons/ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, spacing, useTheme } from "@/src/theme";
+import { spacing, useTheme, makeStyles } from "@/src/theme";
 
 const sideTabs = [
   { label: "Home", icon: "home-outline", activeIcon: "home", path: "/(tabs)/home", match: "/home" },
@@ -13,6 +13,7 @@ const sideTabs = [
 
 export function MainTabBar() {
   const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const pathname = usePathname();
   const left = sideTabs.slice(0, 2);
@@ -45,7 +46,7 @@ export function MainTabBar() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
   bar: { minHeight: 64, flexDirection: "row", alignItems: "flex-end", paddingHorizontal: spacing.xs, paddingBottom: 3 },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 7 },
@@ -59,4 +60,4 @@ const styles = StyleSheet.create({
   },
   createActive: { transform: [{ scale: 1.04 }] },
   createLabel: { fontSize: 10, fontWeight: "700", color: colors.onSurface, marginTop: 1 },
-});
+}));
