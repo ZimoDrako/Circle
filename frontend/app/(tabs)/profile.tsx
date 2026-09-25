@@ -15,6 +15,7 @@ export default function Profile() {
   const [verifying, setVerifying] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
   const [connections, setConnections] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [interestsOpen, setInterestsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<"about" | "events" | "posts" | "circles">("about");
@@ -22,7 +23,8 @@ export default function Profile() {
   useFocusEffect(useCallback(() => {
     (async () => {
       try {
-        const [circles, conns] = await Promise.all([api.listCircles(true), api.listConnections()]);
+        const [circles, conns, eventData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents()]);
+        setEvents(eventData.events || []);
         setCircleCount((circles.circles || []).filter((c: any) => c.type !== "dm").length);
         setConnections(conns.connected || []);
       } catch {}
@@ -76,6 +78,7 @@ export default function Profile() {
   };
 
   const preview = (user.interests || []).slice(0, 4);
+  const profileEvents = events.filter((e: any) => e.creator_id === user.id || e.my_status === "going" || e.my_status === "interested");
 
   return (
     <View style={styles.root}>
@@ -154,7 +157,18 @@ export default function Profile() {
 
         </>}
 
-        {profileTab === "events" && <View style={styles.tabEmpty}><Icon name="calendar-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Events</Text><Text style={styles.tabEmptyText}>Events you create, attend, or choose to share will appear here.</Text></View>}
+        {profileTab === "events" && <View style={styles.eventsSection}>
+          {profileEvents.length === 0 ? <View style={styles.tabEmpty}><Icon name="calendar-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No events yet</Text><Text style={styles.tabEmptyText}>Events you create, attend, or show interest in will appear here.</Text></View> : profileEvents.map((event: any) => {
+            const status = event.creator_id === user.id ? "Created" : event.my_status === "going" ? "Going" : "Interested";
+            return <Pressable key={event.id} style={styles.eventCard} onPress={() => router.push(`/event/${event.id}`)}>
+              {event.cover_image_url ? <Image source={{ uri: event.cover_image_url }} style={styles.eventCover} /> : <View style={styles.eventCoverFallback}><Icon name="calendar" size={24} color={colors.brandPrimary} /></View>}
+              <View style={styles.eventBody}><View style={styles.eventTop}><Text numberOfLines={1} style={styles.eventTitle}>{event.title}</Text><View style={styles.eventStatus}><Text style={styles.eventStatusText}>{status}</Text></View></View>
+              <Text style={styles.eventMeta}>{[event.date, event.time].filter(Boolean).join(" · ")}</Text>
+              {!!event.location && <Text numberOfLines={1} style={styles.eventMeta}>{event.location}</Text>}</View>
+              <Icon name="chevron-forward" size={18} color={colors.muted} />
+            </Pressable>;
+          })}
+        </View>}
         {profileTab === "posts" && <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Posts</Text><Text style={styles.tabEmptyText}>Share plans, questions, photos, and campus moments that help people connect.</Text></View>}
         {profileTab === "circles" && <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Circles</Text><Text style={styles.tabEmptyText}>Larger Circles you choose to show on your profile will appear here. Daily Circles and DMs stay private.</Text></View>}
 
@@ -202,6 +216,7 @@ const styles = StyleSheet.create({
   metrics: { marginHorizontal: spacing.xl, marginTop: spacing.xl, flexDirection: "row", alignItems: "center" }, metric: { flex: 1, alignItems: "center", paddingVertical: 6 }, metricNum: { fontSize: 20, fontWeight: "900", color: colors.onSurface }, metricLabel: { fontSize: 11, color: colors.muted, marginTop: 2 }, metricDivider: { width: 1, height: 30, backgroundColor: colors.border },
   card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   profileTabs: { marginTop: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider, flexDirection: "row", paddingHorizontal: spacing.xl }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { fontSize: 13, fontWeight: "700", color: colors.muted }, profileTabTextActive: { color: colors.brandPrimary, fontWeight: "900" }, profileTabLine: { position: "absolute", bottom: -1, height: 3, width: 34, borderRadius: 2, backgroundColor: colors.brandPrimary }, tabEmpty: { alignItems: "center", paddingHorizontal: 42, paddingVertical: 52 }, tabEmptyTitle: { fontSize: 18, fontWeight: "900", color: colors.onSurface, marginTop: 10 }, tabEmptyText: { fontSize: 13, lineHeight: 19, textAlign: "center", color: colors.muted, marginTop: 6 },
+  eventsSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.md }, eventCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, eventCover: { width: 66, height: 66, borderRadius: radius.md }, eventCoverFallback: { width: 66, height: 66, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, eventBody: { flex: 1, minWidth: 0 }, eventTop: { flexDirection: "row", alignItems: "center", gap: 7 }, eventTitle: { flex: 1, color: colors.onSurface, fontSize: 15, fontWeight: "800" }, eventMeta: { color: colors.muted, fontSize: 12, marginTop: 4 }, eventStatus: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, eventStatusText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
   plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
