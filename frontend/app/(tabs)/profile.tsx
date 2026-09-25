@@ -14,6 +14,7 @@ export default function Profile() {
   const router = useRouter();
   const [verifying, setVerifying] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
+  const [myCircles, setMyCircles] = useState<any[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [interestsOpen, setInterestsOpen] = useState(false);
@@ -25,7 +26,9 @@ export default function Profile() {
       try {
         const [circles, conns, eventData] = await Promise.all([api.listCircles(true), api.listConnections(), api.listEvents()]);
         setEvents(eventData.events || []);
-        setCircleCount((circles.circles || []).filter((c: any) => c.type !== "dm").length);
+        const mine = (circles.circles || []).filter((c: any) => c.type !== "dm");
+        setMyCircles(mine);
+        setCircleCount(mine.length);
         setConnections(conns.connected || []);
       } catch {}
     })();
@@ -170,7 +173,27 @@ export default function Profile() {
           })}
         </View>}
         {profileTab === "posts" && <View style={styles.tabEmpty}><Icon name="chatbubble-ellipses-outline" size={30} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Posts</Text><Text style={styles.tabEmptyText}>Share plans, questions, photos, and campus moments that help people connect.</Text></View>}
-        {profileTab === "circles" && <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>Circles</Text><Text style={styles.tabEmptyText}>Larger Circles you choose to show on your profile will appear here. Daily Circles and DMs stay private.</Text></View>}
+        {profileTab === "circles" && <View style={styles.eventsSection}>
+          {myCircles.filter((circle: any) => circle.type !== "daily").length === 0 ? <View style={styles.tabEmpty}><Icon name="people-circle-outline" size={32} color={colors.brandPrimary} /><Text style={styles.tabEmptyTitle}>No public Circles yet</Text><Text style={styles.tabEmptyText}>Community, hobby, and school Circles can be shown here. Daily Circles and DMs always stay private.</Text></View> : myCircles.filter((circle: any) => circle.type !== "daily").map((circle: any) => {
+            const shown = (circle.profile_visible_member_ids || []).includes(user.id);
+            return <View key={circle.id} style={styles.circleProfileRow}>
+              <Pressable style={styles.circleProfileMain} onPress={() => router.push(`/circle/${circle.id}`)}>
+                <View style={styles.circleIcon}><Icon name="people" size={22} color={colors.brandPrimary} /></View>
+                <View style={{ flex: 1 }}><Text style={styles.eventTitle}>{circle.name}</Text><Text numberOfLines={1} style={styles.eventMeta}>{(circle.interests || []).slice(0, 3).join(" · ") || `${(circle.member_ids || []).length} members`}</Text></View>
+              </Pressable>
+              <Pressable style={[styles.visibilityButton, shown && styles.visibilityButtonOn]} onPress={async () => {
+                try {
+                  await api.setCircleProfileVisibility(circle.id, !shown);
+                  setMyCircles((prev) => prev.map((item: any) => item.id === circle.id ? { ...item, profile_visible_member_ids: !shown ? [...(item.profile_visible_member_ids || []), user.id] : (item.profile_visible_member_ids || []).filter((id: string) => id !== user.id) } : item));
+                } catch {}
+              }}>
+                <Icon name={shown ? "eye" : "eye-off-outline"} size={15} color={shown ? colors.onBrandPrimary : colors.brandPrimary} />
+                <Text style={[styles.visibilityText, shown && styles.visibilityTextOn]}>{shown ? "Shown" : "Show"}</Text>
+              </Pressable>
+            </View>;
+          })}
+          {myCircles.some((circle: any) => circle.type === "daily") && <Text style={styles.privateNote}>Daily Circles stay private and never appear on your public profile.</Text>}
+        </View>}
 
         <View style={styles.signout}><Button label="Sign out" variant="secondary" onPress={async () => { await signOut(); router.replace("/(auth)/welcome"); }} testID="profile-signout" /></View>
       </ScrollView>
@@ -217,6 +240,7 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border },
   profileTabs: { marginTop: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.divider, flexDirection: "row", paddingHorizontal: spacing.xl }, profileTab: { flex: 1, alignItems: "center", paddingVertical: 12, position: "relative" }, profileTabText: { fontSize: 13, fontWeight: "700", color: colors.muted }, profileTabTextActive: { color: colors.brandPrimary, fontWeight: "900" }, profileTabLine: { position: "absolute", bottom: -1, height: 3, width: 34, borderRadius: 2, backgroundColor: colors.brandPrimary }, tabEmpty: { alignItems: "center", paddingHorizontal: 42, paddingVertical: 52 }, tabEmptyTitle: { fontSize: 18, fontWeight: "900", color: colors.onSurface, marginTop: 10 }, tabEmptyText: { fontSize: 13, lineHeight: 19, textAlign: "center", color: colors.muted, marginTop: 6 },
   eventsSection: { paddingHorizontal: spacing.xl, paddingTop: spacing.md }, eventCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, eventCover: { width: 66, height: 66, borderRadius: radius.md }, eventCoverFallback: { width: 66, height: 66, borderRadius: radius.md, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, eventBody: { flex: 1, minWidth: 0 }, eventTop: { flexDirection: "row", alignItems: "center", gap: 7 }, eventTitle: { flex: 1, color: colors.onSurface, fontSize: 15, fontWeight: "800" }, eventMeta: { color: colors.muted, fontSize: 12, marginTop: 4 }, eventStatus: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.brandTertiary }, eventStatusText: { color: colors.brandPrimary, fontSize: 10, fontWeight: "800" },
+  circleProfileRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.divider }, circleProfileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }, circleIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }, visibilityButton: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.brandPrimary, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 7 }, visibilityButtonOn: { backgroundColor: colors.brandPrimary }, visibilityText: { color: colors.brandPrimary, fontSize: 11, fontWeight: "800" }, visibilityTextOn: { color: colors.onBrandPrimary }, privateNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: spacing.md, textAlign: "center" },
   plainSection: { marginHorizontal: spacing.xl, marginTop: spacing.lg, paddingVertical: spacing.sm },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, cardTitle: { fontSize: 17, fontWeight: "800", color: colors.onSurface }, cardSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bio: { color: colors.onSurfaceSecondary, fontSize: 14, lineHeight: 21, marginTop: spacing.sm }, detailRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, detailPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill }, detailText: { fontSize: 12, color: colors.onSurfaceSecondary, fontWeight: "600" },
