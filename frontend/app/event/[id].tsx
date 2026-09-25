@@ -5,12 +5,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "@react-native-vector-icons/ionicons";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar, Button, CompatibilityBadge } from "@/src/ui";
 import { api } from "@/src/api";
 import { MainTabBar } from "@/src/components/main-tab-bar";
 
 export default function EventDetail() {
+  const { colors: themeColors } = useTheme();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [event, setEvent] = useState<any>(null);
@@ -103,9 +105,9 @@ export default function EventDetail() {
           </View>
 
           <Pressable onPress={() => router.push(`/event-invite/${event.id}`)} style={styles.inviteButton} testID="event-invite">
-            <Icon name="person-add-outline" size={18} color={colors.brandPrimary} />
+            <Icon name="person-add-outline" size={18} color={themeColors.brandPrimary} />
             <Text style={styles.inviteText}>Invite connections</Text>
-            <Icon name="chevron-forward" size={18} color={colors.muted} />
+            <Icon name="chevron-forward" size={18} color={themeColors.muted} />
           </Pressable>
 
           <View style={styles.rsvpRow}>
@@ -128,7 +130,7 @@ export default function EventDetail() {
 
           {event.my_status && (
             <View style={styles.reminderNote} testID="event-reminder-note">
-              <Icon name="alarm-outline" size={16} color={colors.brandPrimary} />
+              <Icon name="alarm-outline" size={16} color={themeColors.brandPrimary} />
               <Text style={styles.reminderText}>{"We'll nudge you on Home 2 hours before this starts."}</Text>
             </View>
           )}
@@ -166,7 +168,7 @@ export default function EventDetail() {
                     <Text style={styles.attStatus}>{a.status === "going" ? "Going" : "Interested"}</Text>
                   </View>
                   <View style={[styles.check, isSel && { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary }]}>
-                    {isSel && <Icon name="checkmark" size={16} color={colors.onBrandPrimary} />}
+                    {isSel && <Icon name="checkmark" size={16} color={themeColors.onBrandPrimary} />}
                   </View>
                 </Pressable>
               );
@@ -185,7 +187,7 @@ export default function EventDetail() {
               onChangeText={setCircleName}
               maxLength={120}
               placeholder="Group name"
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={themeColors.muted}
               style={styles.nameInput}
               testID="event-circle-name"
             />
@@ -214,7 +216,7 @@ export default function EventDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   nameModalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: spacing.xl },
   nameModalCard: { width: "100%", maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, borderWidth: 1, borderColor: colors.border },
   nameModalTitle: { color: colors.onSurface, fontSize: 20, fontWeight: "800" },
@@ -254,4 +256,4 @@ const styles = StyleSheet.create({
   attStatus: { color: colors.brandPrimary, fontSize: 11, fontWeight: "600", marginTop: 2 },
   check: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   footer: { position: "absolute", left: 0, right: 0, bottom: 57, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.divider },
-});
+}));
