@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Pressable, RefreshControl, Modal } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { View, Text, ScrollView, Pressable, RefreshControl, Modal, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,6 +8,8 @@ import { spacing, radius, useTheme, makeStyles } from "@/src/theme";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { rankHomeEvents, mixHomeFeed, eventDayLabel } from "@/src/discovery";
+import type { HomeEventCard } from "@/src/discovery";
 
 export default function Home() {
   const { colors: themeColors } = useTheme();
@@ -23,28 +25,46 @@ export default function Home() {
   const [feedMode, setFeedMode] = useState<"for_you" | "connections">("for_you");
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
 
+  const [loadedMode, setLoadedMode] = useState<typeof feedMode | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [clock, setClock] = useState(() => new Date());
+  const requestId = useRef(0);
+
   const load = useCallback(async () => {
+    const request = ++requestId.current;
     setRefreshing(true);
-    try {
-      const extras = feedMode === "for_you"
-        ? [api.getMatches(), api.listEvents()]
-        : [Promise.resolve({ matches: [] }), Promise.resolve({ events: [] })];
-      const [rem, nt, pf, m, e] = await Promise.all([
-        api.reminders(),
-        api.notifications(),
-        api.listPosts(undefined, feedMode),
-        ...extras,
-      ]);
-      setReminders(rem.reminders || []);
-      setUnreadCount(nt.unread_count || 0);
-      setPosts(pf.posts || []);
-      setMatches((m as any).matches || []);
-      setEvents((e as any).events || []);
-    } catch {}
+    setLoadError("");
+    const results = await Promise.allSettled([
+      api.reminders(), api.notifications(), api.listPosts(undefined, feedMode),
+      feedMode === "for_you" ? api.getMatches() : Promise.resolve({ matches: [] }),
+      feedMode === "for_you" ? api.listEvents() : Promise.resolve({ events: [] }),
+    ]);
+    if (request !== requestId.current) return;
+    const [rem, nt, pf, m, e] = results;
+    setReminders(rem.status === "fulfilled" ? rem.value.reminders || [] : []);
+    if (nt.status === "fulfilled") setUnreadCount(nt.value.unread_count || 0);
+    setPosts(pf.status === "fulfilled" ? pf.value.posts || [] : []);
+    setMatches(m.status === "fulfilled" ? m.value.matches || [] : []);
+    setEvents(e.status === "fulfilled" ? e.value.events || [] : []);
+    const labels = ["reminders", "activity", "posts", "people", "events"];
+    const failed = results.flatMap((result, index) => result.status === "rejected" ? [labels[index]] : []);
+    setLoadError(failed.length ? `Couldn't load ${failed.join(", ")}. Pull down to retry.` : "");
+    setLoadedMode(feedMode);
+    setClock(new Date());
     setRefreshing(false);
   }, [feedMode]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    const timer = setInterval(() => setClock(new Date()), 60000);
+    return () => { requestId.current += 1; clearInterval(timer); };
+  }, [load]));
+
+  const selectFeedMode = (mode: typeof feedMode) => {
+    setFeedMode(mode);
+    setVisibleCount(12);
+  };
 
   const dismissReminder = async (eventId: string) => {
     setReminders((r) => r.filter((x) => x.id !== eventId));
@@ -53,15 +73,43 @@ export default function Home() {
 
   const fmtMins = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`);
   const topMatch = matches[0];
-  const interests = ((user as any)?.interests || []).map((x: string) => x.toLowerCase());
-  const rankedEvents = [...events].sort((a: any, b: any) => {
-    const score = (e: any) => {
-      const haystack = [e.title, e.category, e.description].filter(Boolean).join(" ").toLowerCase();
-      return interests.reduce((n: number, interest: string) => n + (haystack.includes(interest) ? 1 : 0), 0);
-    };
-    return score(b) - score(a);
-  });
-  const topEvent = rankedEvents[0];
+  const interests = useMemo<string[]>(() => (user as any)?.interests || [], [user]);
+  const eventCards = useMemo(() => feedMode === "for_you" ? rankHomeEvents(events, interests, clock) : [], [feedMode, events, interests, clock]);
+  const feed = useMemo(() => mixHomeFeed(posts, eventCards), [posts, eventCards]);
+  const visibleFeed = feed.slice(0, visibleCount);
+  const standaloneReminder = reminders.find(reminder => !eventCards.some(card => card.event.id === reminder.id));
+  const ready = loadedMode === feedMode;
+
+  const renderEvent = ({ event, kind, reason }: HomeEventCard) => {
+    const reminder = reminders.find(item => item.id === event.id);
+    const label = kind === "going" ? "YOU'RE GOING" : kind === "interested" ? "YOU'RE INTERESTED" : kind === "recommended" ? "PICKED FOR YOU" : "AROUND CAMPUS";
+    return <View style={styles.eventOpportunity}>
+      <Pressable onPress={() => router.push(`/event/${event.id}`)} testID={`home-event-${event.id}`} accessibilityRole="button" accessibilityLabel={`${event.title}. ${label}. View event details`}>
+        <View style={styles.opportunityTop}>
+          <Text style={styles.opportunityKicker}>{label}</Text>
+          <Icon name={kind === "going" ? "checkmark-circle" : kind === "interested" ? "star" : "calendar-outline"} size={18} color={themeColors.brandPrimary} />
+        </View>
+        <View style={styles.eventOpportunityRow}>
+          {event.cover_image_url ? <Image source={{ uri: event.cover_image_url }} style={styles.eventThumb} contentFit="cover" /> : <View style={styles.eventThumbFallback}><Icon name="calendar-outline" size={22} color={themeColors.brandPrimary} /></View>}
+          <View style={styles.eventBody}>
+            <Text numberOfLines={2} style={styles.eventName}>{event.title}</Text>
+            <Text style={styles.eventDate}>{eventDayLabel(event.date, clock)}{event.time ? ` · ${event.time}` : ""}</Text>
+            {!!event.location && <Text numberOfLines={1} style={styles.opportunityReason}>{event.location}</Text>}
+          </View>
+        </View>
+        <Text style={styles.eventReason}>{reason}</Text>
+        <View style={styles.eventFooter}>
+          <Text style={styles.eventAction}>{kind === "going" ? "View your plan" : kind === "interested" ? "See who's going" : "See event & join"} →</Text>
+          {(event.going_count || 0) > 0 && <Text style={styles.eventAttendance}>{event.going_count} going</Text>}
+        </View>
+      </Pressable>
+      {reminder && <View style={styles.eventReminder}>
+        <Icon name="time-outline" size={15} color={themeColors.brandPrimary} />
+        <Text style={styles.eventReminderText}>Starts in {fmtMins(reminder.starts_in_minutes)}</Text>
+        <Pressable onPress={() => void dismissReminder(event.id)} hitSlop={10} accessibilityLabel="Dismiss event reminder" accessibilityRole="button"><Icon name="close" size={17} color={themeColors.muted} /></Pressable>
+      </View>}
+    </View>;
+  };
   return (
     <SafeAreaView style={styles.root} edges={["top"]}>
       <ScrollView
@@ -85,25 +133,35 @@ export default function Home() {
 
         <View style={styles.feedTabs}>
           <View style={styles.feedTabGroup}>
-            <Pressable onPress={() => setFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
-            <Pressable onPress={() => setFeedMode("connections")} style={[styles.feedTab, feedMode === "connections" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "connections" && styles.feedTabTextActive]}>Connections</Text></Pressable>
+            <Pressable onPress={() => selectFeedMode("for_you")} style={[styles.feedTab, feedMode === "for_you" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "for_you" && styles.feedTabTextActive]}>For You</Text></Pressable>
+            <Pressable onPress={() => selectFeedMode("connections")} style={[styles.feedTab, feedMode === "connections" && styles.feedTabActive]}><Text style={[styles.feedTabText, feedMode === "connections" && styles.feedTabTextActive]}>Connections</Text></Pressable>
           </View>
           <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.feedCreate} testID="home-create-menu"><Icon name="add" size={26} color={themeColors.onSurface} /></Pressable>
         </View>
         <View style={styles.feed}>
-          {posts.length === 0 ? (
-            <View style={styles.feedEmpty}>
-              <Icon name="chatbubbles-outline" size={30} color={themeColors.brandPrimary} />
-              <Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text>
-              <Text style={styles.feedEmptyText}>Start something, make a plan, or find people who are down.</Text>
-              <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.emptyAction}><Text style={styles.emptyActionText}>Start something</Text></Pressable>
-            </View>
-          ) : (
-            <>
-              {posts.map((post:any, index:number) => {
-                const actionable = ["anyone_down","looking_for_people"].includes(post.intent);
-                return (
-                  <View key={post.id}>
+          {ready && !!loadError && <Text style={styles.feedError} accessibilityLiveRegion="polite">{loadError}</Text>}
+          {!ready ? <View style={styles.feedLoading}><ActivityIndicator color={themeColors.brandPrimary} /><Text style={styles.feedEmptyText}>Finding what's happening...</Text></View> : <>
+            {standaloneReminder && <View style={styles.feedSignal}>
+              <Pressable onPress={() => router.push(`/event/${standaloneReminder.id}`)} style={styles.signalBody} testID={`reminder-${standaloneReminder.id}`}>
+                <Text style={styles.signalKicker}>COMING UP</Text>
+                <Text style={styles.signalTitle}>Starts in {fmtMins(standaloneReminder.starts_in_minutes)} · {standaloneReminder.title}</Text>
+                <Text numberOfLines={1} style={styles.signalMeta}>{standaloneReminder.time} · {standaloneReminder.location}</Text>
+              </Pressable>
+              <Pressable onPress={() => void dismissReminder(standaloneReminder.id)} hitSlop={10} accessibilityLabel="Dismiss event reminder"><Icon name="close" size={17} color={themeColors.muted} /></Pressable>
+            </View>}
+            {feed.length === 0 && !refreshing && !loadError ? (
+              <View style={styles.feedEmpty}>
+                <Icon name="chatbubbles-outline" size={30} color={themeColors.brandPrimary} />
+                <Text style={styles.feedEmptyTitle}>{feedMode === "connections" ? "Your connections are quiet" : "Campus is quiet right now"}</Text>
+                <Text style={styles.feedEmptyText}>Start something, make a plan, or find people who are down.</Text>
+                <Pressable onPress={() => setCreateMenuOpen(true)} style={styles.emptyAction}><Text style={styles.emptyActionText}>Start something</Text></Pressable>
+              </View>
+            ) : <>
+              {visibleFeed.map((item, index) => {
+                const post = item.type === "post" ? item.post : null;
+                const actionable = post && ["anyone_down", "looking_for_people"].includes(post.intent);
+                return <View key={item.key}>
+                  {item.type === "event" ? renderEvent(item.card) : post && (
                     <Pressable onPress={() => router.push(`/post/${post.id}`)} style={styles.feedPost}>
                       <Avatar uri={post.author?.profile_photo_url} name={post.author?.first_name} size={42} />
                       <View style={styles.feedPostBody}>
@@ -118,8 +176,9 @@ export default function Home() {
                         </View>
                       </View>
                     </Pressable>
-                    {feedMode === "for_you" && index === 0 && topMatch && (
-                      <Pressable onPress={() => router.push(`/match/${topMatch.user.id}`)} style={styles.personOpportunity} testID="home-person-for-you">
+                  )}
+                  {feedMode === "for_you" && topMatch && index === Math.min(2, visibleFeed.length - 1) && (
+                    <Pressable onPress={() => router.push(`/match/${topMatch.user.id}`)} style={styles.personOpportunity} testID="home-person-for-you">
                         <View style={styles.opportunityTop}>
                           <Text style={styles.opportunityKicker}>PERSON FOR YOU</Text>
                           <Text style={styles.matchPercent}>{topMatch.compatibility}% match</Text>
@@ -135,48 +194,17 @@ export default function Home() {
                           <Icon name="arrow-forward" size={20} color={themeColors.brandPrimary} />
                         </View>
                       </Pressable>
-                    )}
-                    {feedMode === "for_you" && index === 2 && topEvent && (
-                      <Pressable onPress={() => router.push(`/event/${topEvent.id}`)} style={styles.eventOpportunity} testID="home-event-for-you">
-                        <View style={styles.opportunityTop}>
-                          <Text style={styles.opportunityKicker}>SOMETHING FOR YOU</Text>
-                          <Text style={styles.eventWhen}>{topEvent.time || "Coming up"}</Text>
-                        </View>
-                        <View style={styles.eventOpportunityRow}>
-                          {topEvent.cover_image_url ? <Image source={{ uri: topEvent.cover_image_url }} style={styles.eventThumb} contentFit="cover" /> : <View style={styles.eventThumbFallback}><Icon name="calendar-outline" size={22} color={themeColors.brandPrimary} /></View>}
-                          <View style={styles.eventBody}>
-                            <Text numberOfLines={1} style={styles.eventName}>{topEvent.title}</Text>
-                            <Text numberOfLines={2} style={styles.opportunityReason}>{topEvent.location || topEvent.category || "A campus event picked for you"}</Text>
-                            <Text style={styles.eventAction}>Find people to go with →</Text>
-                          </View>
-                        </View>
-                      </Pressable>
-                    )}
-                                        {index === 1 && reminders.length > 0 && (() => {
-                      const r = reminders[0];
-                      return (
-                        <Pressable testID={`reminder-${r.id}`} onPress={() => router.push(`/event/${r.id}`)} style={styles.feedSignal}>
-                          <View style={styles.signalIcon}><Icon name="time-outline" size={19} color={themeColors.brandPrimary} /></View>
-                          <View style={styles.signalBody}>
-                            <Text style={styles.signalKicker}>COMING UP</Text>
-                            <Text style={styles.signalTitle}>Starts in {fmtMins(r.starts_in_minutes)} · {r.title}</Text>
-                            <Text numberOfLines={1} style={styles.signalMeta}>{r.time} · {r.location}</Text>
-                          </View>
-                          <Pressable onPress={() => dismissReminder(r.id)} hitSlop={10}><Icon name="close" size={17} color={themeColors.muted} /></Pressable>
-                        </Pressable>
-                      );
-                    })()}
-                  </View>
-                );
+                  )}
+                </View>;
               })}
-              <View style={styles.caughtUp}>
+              {feed.length > visibleCount ? <Pressable onPress={() => setVisibleCount(count => count + 12)} style={styles.showMore} accessibilityRole="button"><Text style={styles.exploreLink}>{feedMode === "for_you" ? "Show more posts & events" : "Show more posts"}</Text><Icon name="chevron-down" size={18} color={themeColors.brandPrimary} /></Pressable> : feed.length > 0 && <View style={styles.caughtUp}>
                 <View style={styles.caughtIcon}><Icon name="checkmark" size={18} color={themeColors.brandPrimary} /></View>
                 <Text style={styles.caughtTitle}>You're caught up</Text>
                 <Text style={styles.caughtText}>See what else is happening around campus.</Text>
                 <Pressable onPress={() => router.push("/(tabs)/discover")}><Text style={styles.exploreLink}>Explore campus →</Text></Pressable>
-              </View>
-            </>
-          )}
+              </View>}
+            </>}
+          </>}
         </View>
       </ScrollView>
       <Modal visible={createMenuOpen} transparent animationType="fade" onRequestClose={() => setCreateMenuOpen(false)}>
@@ -244,6 +272,15 @@ const useStyles = makeStyles((colors) => ({
   eventBody: { flex: 1, minWidth: 0 },
   eventName: { color: colors.onSurface, fontSize: 16, fontWeight: "900" },
   eventWhen: { color: colors.muted, fontSize: 11, fontWeight: "700" },
+  eventDate: { color: colors.onSurfaceSecondary, fontSize: 12, fontWeight: "700", marginTop: 5 },
+  eventReason: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 12 },
+  eventFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
+  eventAttendance: { color: colors.muted, fontSize: 11, marginTop: 7 },
+  eventReminder: { flexDirection: "row", alignItems: "center", gap: 7, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 12, paddingTop: 12 },
+  eventReminderText: { flex: 1, color: colors.brandPrimary, fontSize: 12, fontWeight: "700" },
+  feedLoading: { paddingVertical: 48, alignItems: "center", gap: 12 },
+  feedError: { color: colors.error, fontSize: 12, lineHeight: 18, paddingVertical: 12 },
+  showMore: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14 },
   eventAction: { color: colors.brandPrimary, fontSize: 12, fontWeight: "900", marginTop: 7 },
 
     feedSignal: { flexDirection: "row", alignItems: "center", gap: 11, marginVertical: 8, paddingVertical: 13, paddingHorizontal: 12, borderRadius: radius.lg, backgroundColor: colors.brandTertiary },
@@ -275,3 +312,4 @@ const useStyles = makeStyles((colors) => ({
   createOptionTitle: { color: colors.onSurface, fontSize: 15, fontWeight: "900" },
   createOptionText: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2 },
 }));
+

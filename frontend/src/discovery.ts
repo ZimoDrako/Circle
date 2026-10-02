@@ -106,3 +106,84 @@ export function visibleKinds(filter: string) {
     clubs: filter === "Clubs" || (!category && !timed),
     recommendations: !category && !timed };
 }
+
+export type HomeEvent = DiscoveryEvent & {
+  id: string;
+  my_status?: string | null;
+  cover_image_url?: string | null;
+  going_count?: number;
+};
+export type HomeEventCard = {
+  event: HomeEvent;
+  kind: "going" | "interested" | "recommended" | "explore";
+  reason: string;
+};
+
+// Keep personal plans and fresh suggestions represented, even when one group is large.
+export function rankHomeEvents(events: HomeEvent[], interests: string[], now = new Date()): HomeEventCard[] {
+  const unique = [...new Map(events.map(event => [event.id, event])).values()];
+  const upcoming = unique.filter(event => isUpcoming(event, now));
+  const isPicked = (event: HomeEvent) => event.my_status === "going" || event.my_status === "interested";
+  const picked = unique.filter(isPicked);
+  const normalize = (value: string) => value.trim().toLowerCase();
+  const meaningful = (value: string) => value && !["other", "general", "event", "events"].includes(value);
+  const chosenCategories = new Set(picked.map(event => normalize(event.category || "")).filter(meaningful));
+  const chosenTags = new Set(picked.flatMap(event => event.tags || []).map(normalize).filter(meaningful));
+  const explicit = [...new Map(interests.filter(interest => interest.trim()).map(interest => [normalize(interest), interest.trim()])).values()];
+
+  const personal: HomeEventCard[] = upcoming.filter(isPicked).sort(chronological).map(event => ({
+    event, kind: event.my_status === "going" ? "going" : "interested",
+    reason: event.my_status === "going" ? "Your plan is saved. See who's going and get your crew together." : "You marked this one Interested. See the details and decide if you're going.",
+  }));
+  const suggestions = upcoming.filter(event => !isPicked(event)).map(event => {
+    const text = discoveryText(event);
+    const shared = explicit.filter(interest => text.includes(normalize(interest)));
+    const sameCategory = chosenCategories.has(normalize(event.category || ""));
+    const sharedTags = (event.tags || []).filter(tag => chosenTags.has(normalize(tag)));
+    const score = shared.length * 4 + (sameCategory ? 3 : 0) + Math.min(3, sharedTags.length) * 2;
+    const reason = shared.length ? `Because you like ${shared.slice(0, 2).join(" and ")}`
+      : sameCategory || sharedTags.length ? "Similar to events you've marked Interested or Going"
+      : "Something new to explore around campus";
+    return { event, kind: score > 0 ? "recommended" as const : "explore" as const, reason, score };
+  }).sort((a, b) => b.score - a.score || chronological(a.event, b.event));
+
+  const cards: HomeEventCard[] = [];
+  for (let i = 0; i < Math.max(personal.length, suggestions.length); i++) {
+    if (personal[i]) cards.push(personal[i]);
+    if (suggestions[i]) cards.push(suggestions[i]);
+  }
+  return cards;
+}
+
+export type HomeFeedItem<T> = { type: "post"; key: string; post: T }
+  | { type: "event"; key: string; card: HomeEventCard };
+
+export function mixHomeFeed<T extends { id: string }>(posts: T[], events: HomeEventCard[]): HomeFeedItem<T>[] {
+  const feed: HomeFeedItem<T>[] = [];
+  const uniquePosts = [...new Map(posts.map(post => [post.id, post])).values()];
+  const uniqueEvents = [...new Map(events.map(card => [card.event.id, card])).values()];
+  let postIndex = 0;
+  let eventIndex = 0;
+  while (postIndex < uniquePosts.length || eventIndex < uniqueEvents.length) {
+    for (let i = 0; i < 2 && postIndex < uniquePosts.length; i++) {
+      const post = uniquePosts[postIndex++];
+      feed.push({ type: "post", key: `post-${post.id}`, post });
+    }
+    if (eventIndex < uniqueEvents.length) {
+      const card = uniqueEvents[eventIndex++];
+      feed.push({ type: "event", key: `event-${card.event.id}`, card });
+    }
+  }
+  return feed;
+}
+
+export function eventDayLabel(date: string | undefined, now = new Date()): string {
+  if (!validDate(date)) return "Date to be confirmed";
+  const today = campusClock(now).date;
+  if (date === today) return "Today";
+  const tomorrow = new Date(`${today}T12:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  if (date === tomorrow.toISOString().slice(0, 10)) return "Tomorrow";
+  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" })
+    .format(new Date(`${date}T12:00:00Z`));
+}
